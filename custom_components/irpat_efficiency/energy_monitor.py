@@ -8,6 +8,7 @@ from homeassistant.util import dt as dt_util
 from .const import DOMAIN
 from .energy_store import EnergyStore
 from .mode_history import observation
+from .paired_energy import pair_signature
 from .source_settings import estimate_cost
 from .telemetry_reader import read_telemetry
 from .topology import empty_topology
@@ -26,7 +27,8 @@ class EnergyMonitor:
     @staticmethod
     def meter_samples(topology, telemetry):
         sources = {s["id"] for s in topology["sources"]}
-        return {s["owner_id"]: s for s in telemetry
+        return {s["owner_id"]: {**s, "pair_signature": pair_signature(topology, s["owner_id"])}
+                for s in telemetry
                 if s["group"] == "sources" and s["role"] == "electrical_energy"
                 and s["owner_id"] in sources}
 
@@ -56,8 +58,7 @@ class EnergyMonitor:
                 mode = observation(binding, state.state, state.last_changed.timestamp(),
                                    reported.timestamp(), dt_util.utcnow().timestamp())
             samples[sid]["pair"] = {
-                "confirmed": source.get("power_boundary_confirmed") is True
-                             and source.get("energy_boundary_confirmed") is True,
+                "confirmed": samples[sid]["pair_signature"] is not None,
                 "thermal": thermal.get(sid), "mode": mode,
             }
         try:
