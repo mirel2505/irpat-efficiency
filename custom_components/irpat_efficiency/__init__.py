@@ -13,9 +13,17 @@ if TYPE_CHECKING:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Initialize the local overview; no equipment calls."""
     from . import panel
+    from .history_store import RoomHistory
 
-    runtime = hass.data.setdefault(DOMAIN, {"active_entries": set()})
-    await panel.async_register(hass)
+    runtime = hass.data.setdefault(DOMAIN, {"active_entries": set(), "histories": {}})
+    history = RoomHistory(hass, entry)
+    await history.async_start()
+    try:
+        await panel.async_register(hass)
+    except Exception:
+        await history.async_stop()
+        raise
+    runtime["histories"][entry.entry_id] = history
     runtime["active_entries"].add(entry.entry_id)
     return True
 
@@ -26,6 +34,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     runtime = hass.data.get(DOMAIN)
     if runtime:
+        history = runtime["histories"].pop(entry.entry_id, None)
+        if history is not None:
+            await history.async_stop()
         runtime["active_entries"].discard(entry.entry_id)
         if not runtime["active_entries"]:
             panel.async_remove(hass)
