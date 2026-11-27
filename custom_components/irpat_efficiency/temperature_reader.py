@@ -3,6 +3,9 @@ from homeassistant.util import dt as dt_util
 
 from .temperature import summarize_room, temperature_c
 
+# Provisional freshness limit for HA reports, not physical measurement age.
+MAX_REPORT_AGE_SECONDS = 7200
+
 
 def read_binding(hass, binding):
     """Return a snapshot with source timestamp and explicit failure reason."""
@@ -14,7 +17,11 @@ def read_binding(hass, binding):
         return reading
     reported = getattr(state, "last_reported", None) or state.last_updated
     reading["reported_at"] = reported.isoformat()
-    reading["age_seconds"] = max(0, (dt_util.utcnow() - reported).total_seconds())
+    age = (dt_util.utcnow() - reported).total_seconds()
+    reading["age_seconds"] = age
+    if age < 0 or age > MAX_REPORT_AGE_SECONDS:
+        reading["status"] = "future" if age < 0 else "stale"
+        return reading
     if entity_id.startswith("climate."):
         value = state.attributes.get("current_temperature")
         unit = state.attributes.get("temperature_unit") or hass.config.units.temperature_unit
