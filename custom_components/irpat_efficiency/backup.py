@@ -22,7 +22,7 @@ async def async_pre_backup(hass):
                                       key, entry_id)
     for key in ("histories", "energy_monitors"):
         for entry_id, monitor in list(runtime.get(key, {}).items()):
-            if monitor.save_failed:
+            if monitor.save_failed or getattr(monitor, 'fuel_save_failed', False):
                 _LOGGER.warning("Backup preparation: %s last save failed for %s; only committed data is recoverable",
                                 key, entry_id)
 
