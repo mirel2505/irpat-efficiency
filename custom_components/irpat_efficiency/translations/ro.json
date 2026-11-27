@@ -47,6 +47,24 @@
         "other": "Altă sursă",
         "unintegrated": "Neintegrată"
       }
+    },
+    "telemetry_role": {
+      "options": {
+        "humidity": "Umiditate",
+        "surface_temperature": "Temperatura pardoselii",
+        "supply_temperature": "Temperatură tur",
+        "return_temperature": "Temperatură retur",
+        "flow": "Debit",
+        "electrical_power": "Putere electrică",
+        "electrical_energy": "Energie electrică",
+        "thermal_power": "Putere termică",
+        "thermal_energy": "Energie termică",
+        "compressor": "Compresor",
+        "defrost": "Degivrare",
+        "burner": "Arzător",
+        "pump": "Pompă",
+        "pressure": "Presiune"
+      }
     }
   },
   "options": {
@@ -63,7 +81,10 @@
           "circuit": "Adaugă circuit",
           "binding": "Adaugă senzor ambiental",
           "save": "Salvează configurația",
-          "outdoor": "Configurează senzor exterior"
+          "outdoor": "Configurează senzor exterior",
+          "telemetry_rooms": "Senzori încăperi",
+          "telemetry_sources": "Senzori surse termice",
+          "telemetry_manifolds": "Senzori distribuitoare"
         }
       },
       "floor": {
@@ -130,6 +151,36 @@
         "data": {
           "entity_id": "Senzor exterior"
         }
+      },
+      "telemetry_rooms": {
+        "title": "Senzori încăperi",
+        "description": "Alege obiectul, rolul și entitatea. Lasă entitatea necompletată pentru a elimina asocierea rolului.",
+        "data": {
+          "owner_id": "Obiect",
+          "role": "Tip măsurătoare",
+          "name": "Denumire proprie (opțional)",
+          "entity_id": "Entitate"
+        }
+      },
+      "telemetry_sources": {
+        "title": "Senzori surse termice",
+        "description": "Alege obiectul, rolul și entitatea. Lasă entitatea necompletată pentru a elimina asocierea rolului.",
+        "data": {
+          "owner_id": "Obiect",
+          "role": "Tip măsurătoare",
+          "name": "Denumire proprie (opțional)",
+          "entity_id": "Entitate"
+        }
+      },
+      "telemetry_manifolds": {
+        "title": "Senzori distribuitoare",
+        "description": "Alege obiectul, rolul și entitatea. Lasă entitatea necompletată pentru a elimina asocierea rolului.",
+        "data": {
+          "owner_id": "Obiect",
+          "role": "Tip măsurătoare",
+          "name": "Denumire proprie (opțional)",
+          "entity_id": "Entitate"
+        }
       }
     },
     "error": {
@@ -142,7 +193,8 @@
       "duplicate_position": "Poziția este deja ocupată.",
       "invalid_entity": "Entitate incompatibilă.",
       "duplicate_entity": "Senzor deja asociat.",
-      "invalid_schema": "Configurație incompatibilă."
+      "invalid_schema": "Configurație incompatibilă.",
+      "invalid_role": "Rol incompatibil."
     }
   }
 }
