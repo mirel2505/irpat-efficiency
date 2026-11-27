@@ -9,6 +9,7 @@ from homeassistant.helpers import selector
 
 from .const import OPERATING_MODES, CIRCUIT_CONTROLS
 from .topology import SOURCE_TYPES, TopologyError, add_item, empty_topology
+from .telemetry import ROLE_GROUPS, set_binding
 
 
 def _choices(values, translation_key):
@@ -37,6 +38,9 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
             menu.append("circuit")
         if t["rooms"]:
             menu.append("binding")
+        for group in ROLE_GROUPS:
+            if t[group]:
+                menu.append(f"telemetry_{group}")
         menu.append("save")
         return self.async_show_menu(step_id="init", menu_options=menu)
 
@@ -135,6 +139,35 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
             vol.Optional("entity_id"): selector.EntitySelector(selector.EntitySelectorConfig(
                 filter=[{"domain": "sensor", "device_class": "temperature"}])),
         }), errors=errors)
+
+    async def _telemetry(self, group, user_input):
+        errors = {}
+        if user_input is not None:
+            try:
+                self._topology = set_binding(
+                    self._topology, group, user_input["owner_id"],
+                    user_input["role"], user_input.get("entity_id") or None,
+                    user_input.get("name") or None,
+                )
+                return await self.async_step_init()
+            except ValueError as exc:
+                errors["base"] = str(exc)
+        return self.async_show_form(step_id=f"telemetry_{group}", data_schema=vol.Schema({
+            vol.Required("owner_id"): self._reference(group),
+            vol.Required("role"): _choices(ROLE_GROUPS[group], "telemetry_role"),
+            vol.Optional("name"): selector.TextSelector(),
+            vol.Optional("entity_id"): selector.EntitySelector(selector.EntitySelectorConfig(
+                filter=[{"domain": "sensor"}, {"domain": "binary_sensor"}])),
+        }), errors=errors)
+
+    async def async_step_telemetry_rooms(self, user_input=None):
+        return await self._telemetry("rooms", user_input)
+
+    async def async_step_telemetry_sources(self, user_input=None):
+        return await self._telemetry("sources", user_input)
+
+    async def async_step_telemetry_manifolds(self, user_input=None):
+        return await self._telemetry("manifolds", user_input)
 
     async def async_step_save(self, user_input=None):
         return self.async_create_entry(title="", data={
