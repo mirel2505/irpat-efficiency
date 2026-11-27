@@ -44,7 +44,7 @@ def _asset_digest():
 def ws_configuration(hass, connection, msg):
     entry = hass.config_entries.async_get_entry(msg["entry_id"])
     if not entry or entry.domain != DOMAIN:
-        connection.send_error(msg["id"], "invalid_reference", "Unknown irPaT installation")
+        connection.send_error(msg["id"], "invalid_reference", "Unknown THERMELYVO installation")
         return
     connection.send_result(msg["id"], snapshot(hass, entry))
 
@@ -61,7 +61,7 @@ def ws_configuration(hass, connection, msg):
 async def ws_configuration_action(hass, connection, msg):
     entry = hass.config_entries.async_get_entry(msg["entry_id"])
     if not entry or entry.domain != DOMAIN:
-        connection.send_error(msg["id"], "invalid_reference", "Unknown irPaT installation")
+        connection.send_error(msg["id"], "invalid_reference", "Unknown THERMELYVO installation")
         return
     locks = hass.data[DOMAIN].setdefault("draft_locks", {})
     async with locks.setdefault(entry.entry_id, asyncio.Lock()):
@@ -336,7 +336,7 @@ async def ws_export_data(hass, connection, msg):
         connection.send_error(msg["id"], "invalid_export", str(exc))
         return
     except Exception:
-        _LOGGER.exception("Could not prepare irPaT export")
+        _LOGGER.exception("Could not prepare THERMELYVO export")
         connection.send_error(msg["id"], "export_failed", "Export preparation failed")
         return
     connection.send_result(msg["id"], result)
@@ -463,7 +463,7 @@ async def async_register(hass):
         await panel_custom.async_register_panel(
             hass, frontend_url_path=PANEL_PATH,
             webcomponent_name="irpat-efficiency-panel", module_url=runtime["panel_asset_url"],
-            sidebar_title="irPaT & Eficiență", sidebar_icon="mdi:heating-coil",
+            sidebar_title="THERMELYVO", sidebar_icon="mdi:heating-coil",
             require_admin=True, embed_iframe=False,
         )
         runtime["panel_registered"] = True

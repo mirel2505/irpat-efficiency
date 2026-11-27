@@ -3,6 +3,9 @@
 The backend is mocked here; real Core WebSocket behavior is tested separately.
 """
 import json
+import os
+import base64
+from copy import deepcopy
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright, expect
@@ -98,7 +101,7 @@ def run_case(browser, language, width, dark):
     panel = page.locator("irpat-efficiency-panel")
     expect(panel.get_by_role("heading", name="Test installation", exact=True)).to_be_visible()
     expect(panel.get_by_text("21.5 °C", exact=True)).to_be_visible()
-    expect(panel.get_by_text("dev5", exact=True)).to_be_visible()
+    expect(panel.get_by_text("dev7", exact=True)).to_be_visible()
     expect(panel.locator(".room-tile")).to_have_attribute("data-status", "cold")
     assert panel.locator(".room-tile").bounding_box()["height"] <= 88, "Closed room tile too tall"
     assert panel.locator(".comfort-grid").evaluate("(e) => getComputedStyle(e).gridTemplateColumns.split(\' \').length") == 3
@@ -184,9 +187,71 @@ def run_case(browser, language, width, dark):
     print(f"PASS: Chromium {language}, {width}px, {'dark' if dark else 'light'}; journal, expert, profile, download")
 
 
+def capture_documentation(browser):
+    """Capture the real panel with fictional measurements (never production data)."""
+    entry = deepcopy(FIXTURE)
+    entry["name"] = "Demo home"
+    entry["topology"]["floors"][0]["name"] = "Ground floor"
+    entry["topology"]["zones"][0]["name"] = "Underfloor heating"
+    entry["topology"]["manifolds"][0]["name"] = "Main manifold"
+    entry["topology"]["rooms"] = []
+    entry["topology"]["circuits"] = []
+    entry["room_temperatures"] = {}
+    entry["topology"]["bindings"] = []
+    entry["journal"][0]["flows_lmin"] = {}
+    for i, (name, target, temp, flow) in enumerate([
+        ("Living room", 22, 22.0, 1.15), ("Bedroom", 21, 20.4, .85),
+        ("Bathroom", 23, 23.5, 1.05), ("Kitchen", 22, 22.1, 1.0)
+    ], 1):
+        rid, cid = f"room{i}", f"loop{i}"
+        entry["topology"]["rooms"].append(dict(id=rid, name=name, floor_id="f",
+                                               heating_target_c=target, cooling_target_c=25))
+        entry["topology"]["circuits"].append(dict(id=cid, name=name, position=i,
+                                                  room_id=rid, manifold_id="m"))
+        entry["topology"]["bindings"].append(dict(id=f"binding{i}", room_id=rid,
+                                                  entity_id=f"sensor.demo_room{i}"))
+        status = "within" if abs(temp-target) <= .3 else ("warm" if temp > target else "cold")
+        entry["room_temperatures"][rid] = dict(
+            readings=[dict(name=f"{name} sensor", temperature_c=temp, age_seconds=20, status="reported")],
+            heating=dict(temperature_c=temp, deviation_c=temp-target, status=status,
+                         valid_count=1, configured_count=1),
+            cooling=dict(temperature_c=temp, deviation_c=temp-25, status="cold",
+                         valid_count=1, configured_count=1))
+        entry["journal"][0]["flows_lmin"][cid] = flow
+    entry["journal"][0]["manifold_total_lmin"] = sum(entry["journal"][0]["flows_lmin"].values())
+    entry["profiles"] = []
+    context = browser.new_context(viewport={"width": 1100, "height": 800}, color_scheme="dark")
+    page = context.new_page()
+    page.route("http://irpat.test/**", lambda route: route.fulfill(content_type="text/html",
+        body="<html><body style='margin:0;background:#171d26'></body></html>"))
+    page.goto("http://irpat.test/")
+    page.add_style_tag(content=":root{--primary-text-color:#e8eef5;--primary-background-color:#171d26;--card-background-color:#222b37;--secondary-text-color:#aebdce;--secondary-background-color:#8882;--divider-color:#8886;--primary-color:#299dc6;--text-primary-color:#fff;font-family:Arial,sans-serif}")
+    page.add_script_tag(path=str(PANEL))
+    page.evaluate(MOCK, {"entry": entry, "language": "en"})
+    panel = page.locator("irpat-efficiency-panel")
+    expect(panel.get_by_role("heading", name="Demo home", exact=True)).to_be_visible()
+    def save(name):
+        data = page.screenshot(type="jpeg", quality=78, animations="disabled")
+        # Only opt-in CI documentation capture; base64 chunks allow a text-only
+        # repository client to recover exact image bytes without exposing user data.
+        encoded = base64.b64encode(data).decode("ascii")
+        for i in range(0, len(encoded), 1000):
+            print(f"THERMELYVO_SCREENSHOT {name} {i//1000:04d} {encoded[i:i+1000]}", flush=True)
+        print(f"THERMELYVO_SCREENSHOT_END {name} {len(encoded)}", flush=True)
+    save("dashboard")
+    panel.get_by_role("button", name="Expert", exact=True).click()
+    save("expert")
+    panel.get_by_role("button", name="Set up home", exact=False).click()
+    expect(panel.locator(".setup")).to_be_visible()
+    save("setup")
+    context.close()
+
+
 if __name__ == "__main__":
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         for args in [("ro", 390, True), ("en", 1440, False)]:
             run_case(browser, *args)
+        if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("THERMELYVO_CAPTURE") == "1":
+            capture_documentation(browser)
         browser.close()

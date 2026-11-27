@@ -1059,7 +1059,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
   setupRemove(parent,collection,id,name) {
     const details=this.node("details",undefined,"remove-confirm");
     details.append(this.node("summary",this.t("Elimină","Remove")));
-    details.append(this.node("p",this.t("Elimini din irPaT: ","Remove from irPaT: ")+name));
+    details.append(this.node("p",this.t("Elimini din THERMELYVO: ","Remove from THERMELYVO: ")+name));
     this.setupButton(details,this.t("Confirmă eliminarea","Confirm removal"),
       ()=>this.setupAction("remove",{collection,id,confirmed:true}),true);
     parent.append(details);
@@ -1428,7 +1428,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
     root.append(style);
     const main = this.node("main");
     const header = this.node("header");
-    const brand=this.node("div",undefined,"brand");brand.append(this.icon("home"),this.node("h1","irPaT & Eficiență"),this.node("small","dev5","version-label"));header.append(brand);
+    const brand=this.node("div",undefined,"brand");brand.append(this.icon("home"),this.node("h1","THERMELYVO"),this.node("small","dev7","version-label"));header.append(brand);
     const refresh = this.node("button",this.t("Actualizează","Refresh"));
     refresh.disabled = this.busy || this.journalSaving;
     refresh.addEventListener("click",()=>this.refresh());

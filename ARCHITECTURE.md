@@ -1,4 +1,4 @@
-# Architecture — irPaT & Eficiență
+# Architecture — THERMELYVO
 Proposed architecture; interfaces are not yet stable. See SPECIFICATION.md.
 
 - Python HA integration under custom_components/irpat_efficiency; domain irpat_efficiency. Local config entry lifecycle, stable per-installation identifiers, runtime data scoped by config entry; unsubscribe listeners on unload. No equipment service calls.

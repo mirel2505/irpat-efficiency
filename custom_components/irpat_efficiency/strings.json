@@ -1,5 +1,5 @@
 {
-  "title": "irPaT & Eficiență",
+  "title": "THERMELYVO",
   "config": {
     "step": {
       "user": {
@@ -168,7 +168,7 @@
         "title": "Add or select floor",
         "menu_options": {
           "floor_existing": "Choose existing Home Assistant floor",
-          "floor_custom": "Create custom floor in irPaT"
+          "floor_custom": "Create custom floor in THERMELYVO"
         }
       },
       "zone": {
@@ -183,7 +183,7 @@
         "title": "Add or select room",
         "menu_options": {
           "room_existing": "Choose existing Home Assistant area",
-          "room_custom": "Create custom room in irPaT"
+          "room_custom": "Create custom room in THERMELYVO"
         }
       },
       "source": {
@@ -352,7 +352,7 @@
       },
       "floor_existing": {
         "title": "Select existing floor",
-        "description": "Reuses a uniquely matching existing irPaT floor by name, keeping its ID. No Home Assistant registry changes.",
+        "description": "Reuses a uniquely matching existing THERMELYVO floor by name, keeping its ID. No Home Assistant registry changes.",
         "data": {
           "ha_floor_id": "Home Assistant floor"
         }
@@ -565,10 +565,10 @@
       },
       "beta_reset": {
         "title": "Reset entire configuration (Beta)",
-        "description": "This immediately applies a fresh irPaT test session: all floors, rooms, zones, distributors, circuits, sources, sensor links, tariffs and the active draft are cleared. All displayed history starts empty. Old storage files remain isolated on disk and are included in native backups; this is not secure erasure and there is no in-app undo. Home Assistant areas, devices, entities, automations and other integrations are unchanged. Make a backup first. Type RESET and confirm. No Core restart is intended; the integration reloads.",
+        "description": "This immediately applies a fresh THERMELYVO test session: all floors, rooms, zones, distributors, circuits, sources, sensor links, tariffs and the active draft are cleared. All displayed history starts empty. Old storage files remain isolated on disk and are included in native backups; this is not secure erasure and there is no in-app undo. Home Assistant areas, devices, entities, automations and other integrations are unchanged. Make a backup first. Type RESET and confirm. No Core restart is intended; the integration reloads.",
         "data": {
           "confirmation": "Type RESET",
-          "confirmed": "I confirm the entire irPaT configuration reset",
+          "confirmed": "I confirm the entire THERMELYVO configuration reset",
           "cancel": "Cancel and return to menu"
         }
       }
@@ -606,7 +606,7 @@
       "draft_conflict": "Configuration or draft changed in another session. Reopen Configure to continue from the latest checkpoint.",
       "draft_read_failed": "Could not read configuration draft. Check Home Assistant logs before retrying.",
       "draft_write_failed": "Could not save the latest draft step. Previous saved checkpoints remain; check logs.",
-      "autosave_reload_failed": "Configuration was saved, but irPaT could not reload. Check the logs and reload the integration."
+      "autosave_reload_failed": "Configuration was saved, but THERMELYVO could not reload. Check the logs and reload the integration."
     }
   }
 }

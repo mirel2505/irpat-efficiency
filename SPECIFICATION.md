@@ -1,4 +1,4 @@
-# irPaT & Eficiență — specificație funcțională
+# THERMELYVO — specificație funcțională
 Status: aprobată ca direcție de produs; implementarea și validarea sunt în curs. 2026-11-27.
 
 ## Scop și principii

@@ -1,88 +1,100 @@
-# irPaT & Eficiență
+<div align="center">
 
-**Asistență locală pentru echilibrarea hidraulică și termică a încălzirii și răcirii prin pardoseală cu agent termic.**
+<img src="custom_components/irpat_efficiency/brand/icon@2x.png" alt="" width="84">
 
-Local, advisory-only Home Assistant integration for hydronic radiant floor heating and cooling.
+# THERMELYVO
 
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Support%20development-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/rmirel2505o)
+**Smart Heating & Cooling Analytics**
 
-## Stadiu / Status
+### Simplicity. Balance. Efficiency.
 
-**0.1.0.dev0 — experimental beta source, public repository; no stable release.** The tested baseline passed isolated Core, Chromium and archive recovery checks. Installation on the owner's Home Assistant requires explicit approval. See [implementation scope and release gates](IMPLEMENTATION_STATUS.md) for the distinction between implemented functionality and the full product specification.
+Local, read-only thermal and energy analytics for Home Assistant.
 
-## Funcționalități / Implemented in source
+[![Development beta](https://img.shields.io/badge/status-development%20beta-8b5cf6?style=flat-square)](IMPLEMENTATION_STATUS.md)
+[![Calculation tests](https://github.com/mirel2505/irpat-efficiency/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/mirel2505/irpat-efficiency/actions/workflows/tests.yml)
+[![Browser validation](https://github.com/mirel2505/irpat-efficiency/actions/workflows/browser.yml/badge.svg?branch=main)](https://github.com/mirel2505/irpat-efficiency/actions/workflows/browser.yml)
+[![GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-2563eb?style=flat-square)](LICENSE)
 
-- Configurare nativă HA, fără YAML obligatoriu: niveluri, camere, zone hidraulice, distribuitoare, circuite, surse și senzori. Editare cu identificatori stabili și eliminare confirmată fără ștergerea în cascadă. / Native configuration and safe identity-preserving editing.
-- Panou local în sidebar, administrator-only, română/engleză, mod simplu/expert, teme HA, afișare adaptivă. / Local bilingual panel with simple and expert views.
-- Monitorizare instantanee a temperaturilor și țintelor de încălzire/răcire; statistici 24/48/72/168 h și comparație cu ieri la aceeași oră. Istoricul local păstrează 8 zile; golurile rămân vizibile. / Room temperature monitoring and bounded local history.
-- Jurnal manual de debite, observații înainte/după, profiluri și comparații brute pe circuit. Ultima observație afișată nu reprezintă debit live. / Manual hydraulic observations and reference profiles.
-- Diagnostic termic pe zone, abatere comună și diferențe între camere, stabilitate observată, analiză climatică și răcire naturală cu confirmarea condițiilor de către utilizator. / Thermal balance, reviewed climate and natural cooling observations.
-- Puteri, diferență tur-retur, energie electrică, cost orientativ și raport energetic pe intervalele cu măsurători compatibile; jurnale de degivrare și regim. / Energy monitoring with measurement boundaries and coverage.
-- Punct de rouă și indicator de risc de condens, cu distincția dintre temperatura măsurată a suprafeței și temperatura apei. / Condensation review; independent physical protection remains necessary.
-- Rapoarte comparative ale clădirii, export JSON versionat și opt categorii CSV; pregătirea jurnalelor pentru backupul nativ HA. / Reviewed building reports, data export and native backup preparation.
+[Overview](#what-it-does) · [How it works](#how-it-works) · [Install](#installation) · [Support](#support) · [Română](docs/README.ro.md)
 
-No external AI or telemetry service is required. No service calls to physical heating/cooling equipment. A selected display mode does not change the equipment mode. Advice remains conditional on measurement coverage, accuracy, comparability and configured operating assumptions.
+</div>
 
-## Configurare / Planned first setup
+---
 
-After a validated installation, add the integration from Settings → Devices & services. Create a named installation, then open Configure and add floors and hydraulic zones before rooms, sources, manifolds, circuits and bindings. Select sensors using the native entity selectors; thermostats supply current_temperature, not setpoints. Set heating and cooling targets separately. Open the irPaT sidebar and select Set up home for graphical guided configuration, automatic temperature suggestions, room editing and loop mapping. Confirmed changes are applied automatically. Advanced settings remain in the native Configure menu. The comfort dashboard exposes outdoor reference and quick room/all-room analysis targets. Heating advice uses two synchronized 24 h windows, ≥90% shared coverage per day, comparable outdoor averages, and explicit user review of operating conditions; directions are hypotheses, never flow setpoints. Floors can be merged and imported selectively. The frontend asset URL is content-versioned to avoid stale browser modules; after updating, restart Home Assistant and reopen the sidebar. Open the irPaT & Eficiență sidebar panel.
+## What it does
 
-Select Expert to see profiles, reviewed climate and inertia forms, mode/defrost journals, building reports and export. Record physical flow readings manually. Leave unavailable values empty. Do not confirm measurement boundaries, continuous operation or comparable conditions without evidence.
+THERMELYVO helps you understand, balance and optimize a hydronic heating or cooling system using your own Home Assistant sensors and manual flow readings.
 
-Temperature history samples every five minutes while HA is running; reports older than the provisional two-hour limit and future timestamps are excluded. Configuration edits restart eligible comparison history conservatively. A retained sample is not proof of a fresh physical sensor measurement. Do not interpret stability as certified hydraulic balance.
+| Understand | Balance | Optimize |
+| :--- | :--- | :--- |
+| Room temperatures and individual targets | Identify persistent room-to-room temperature differences | Review the weather-compensation curve only after relative thermal balance |
+| Supply, return, flow and energy measurements | Record circuit flow adjustments and compare their effects | Track heat-pump performance, energy use and operating costs |
 
-## Backup and recovery / Backup și restaurare
+**It monitors, analyzes and recommends. You remain in control.** No equipment control commands, external AI service or mandatory cloud connection.
 
-Use **Settings → System → Backups** and include Home Assistant settings. Keep the backup and emergency kit outside the HA device. The integration retries pending defrost/mode journal saves before native backup. This is not an atomic snapshot across all stores; unsaved records may be lost. Restoring HA settings may replace other system configuration. Keep a current backup before restoring. CSV/JSON are analysis archives, not directly restorable backups. See [official HA backup guidance](https://www.home-assistant.io/common-tasks/general/backups/).
+## How it works
 
-## Instalare beta / Beta installation
+<p align="center"><img src="docs/images/system.svg" alt="Direct hydronic system: outdoor temperature informs weather compensation; source supply and return connect directly to a manifold and room circuits. THERMELYVO observes and recommends." width="760"></p>
 
-**Experimental beta.** The repository is public, with the owner's approval. Direct installation through a custom repository is available to try; this is not a listing in the default catalog or a claim of successful installation on a production system.
+Our focus is on simple, well-designed hydronic systems: weather compensation, direct supply and return, manually balanced circuits, and room temperature sensors for monitoring rather than on/off control.
+
+Where the equipment and installation allow, avoid unnecessary buffer tanks, mixing groups, secondary pumps and room actuators. Always follow the manufacturer's requirements for minimum flow, water volume, safety devices and condensation protection.
+
+### Balance first. Then optimize.
+
+1. **Hydraulic balance** — record circuit flows and adjust the distribution manually.
+2. **Thermal balance** — compare each room against its own target and allow the building to settle.
+3. **Weather compensation** — review the curve only when all rooms served by the source are relatively balanced and the building is consistently too warm or too cold.
+
+A warm room and a cold room are not a reason to raise or lower the entire heating curve. A shared temperature offset across balanced rooms may be.
+
+## Inside THERMELYVO
+
+The bilingual panel includes a compact comfort dashboard, guided configuration, room and circuit views, manual adjustment history and an expert analysis mode.
+
+- **Comfort:** room targets, temperature deviations and local history.
+- **Hydraulics:** manifolds, circuit flow records, adjustments and reference profiles.
+- **Energy:** supply/return temperatures, thermal power, COP or measured energy ratios, consumption, costs and defrost history, where data supports them.
+- **Cooling:** temperature monitoring and dew-point/condensation indicators. Independent physical safeguards are still required.
+- **Data:** reviewed reports, CSV/JSON export and native Home Assistant backup preparation.
+
+## Installation
+
+> **Development beta — not a stable release.** Install on a test system first and make a current Home Assistant backup.
 
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mirel2505&repository=irpat-efficiency&category=integration)
 
-**HACS:** Open the button above, add the custom repository as an Integration and choose Download. If needed, use HACS → three-dot menu → Custom repositories and add `https://github.com/mirel2505/irpat-efficiency`, category Integration. Select the default branch if no release is offered. See [HACS custom repositories](https://hacs.dev/docs/faq/custom_repositories/).
+1. Add this repository as a custom **Integration** in HACS and download the available development version.
+2. Restart Home Assistant if required.
+3. Go to **Settings → Devices & services → Add integration**, search for **THERMELYVO**, and add it.
+4. Open **THERMELYVO** in the sidebar and select **Set up home** to configure your rooms, circuits, heat sources and sensors.
 
-**Home Assistant Marketplace (2026.11 onwards):** Settings → Marketplace → Add from link → enter the same repository URL, select Integration if prompted. See [official Marketplace documentation](https://www.home-assistant.io/integrations/marketplace/#custom-repositories). A downloadable version must be available; actual Marketplace installation remains unverified.
+[![Add THERMELYVO](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=irpat_efficiency)
 
-Make a current backup before installation. After download, restart Core if required, then add the integration under Settings → Devices & services → Add integration.
+The configuration shortcut is not an installer. [Detailed installation, upgrade and backup instructions](docs/INSTALLATION.md).
 
-[![Configure irPaT & Eficiență after installation](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=irpat_efficiency)
+**Existing users:** THERMELYVO is the new name of irPaT & Eficiență. The internal integration domain and storage identity remain unchanged to preserve configuration, history and compatibility. No fresh install or reset is intended.
 
-**The configuration shortcut does not install code.** Use it only after downloading the integration and restarting if required.
+## Project status
 
-Manual fallback: download the [tested candidate artifact](https://github.com/mirel2505/irpat-efficiency/actions/runs/45986377754/artifacts/15191098252), extract both ZIPs, check SHA256SUMS.txt and copy the entire `custom_components/irpat_efficiency` directory to the HA configuration directory. Artifacts expire after 14 days. No stable release has been published.
+Active development. Heating recommendations require adequate aligned history, comparable operating conditions and review by the user. The project does not certify hydraulic balance or guarantee savings. Cooling curve optimization is not currently supported.
 
-**RO:** Apasă butonul HACS, adaugă repository-ul ca Integration, descarcă integrarea, repornește Core dacă este necesar și apoi configureaz-o din Devices & services. Fă un backup înainte. Integrarea rămâne consultativă, fără comenzi asupra instalației.
+[Implementation status](IMPLEMENTATION_STATUS.md) · [Algorithms](ALGORITHMS.md) · [Architecture](ARCHITECTURE.md) · [Roadmap](ROADMAP.md) · [Test runs](https://github.com/mirel2505/irpat-efficiency/actions)
 
-## Development and verification
+## Support
 
-Run from the repository root:
+Report a bug or suggest an improvement through [GitHub Issues](https://github.com/mirel2505/irpat-efficiency/issues). Include your Home Assistant version, THERMELYVO version and relevant anonymized screenshots or logs. Do not share access tokens, private URLs or personal information.
 
-```sh
-python -m unittest discover -s tests -v
-python -m compileall -q custom_components
-node --check custom_components/irpat_efficiency/frontend/panel.js
-node scripts/check_ui_contracts.mjs
-node scripts/test_panel_behavior.mjs
-```
+If this project helps you, voluntary contributions support development and maintenance. No features are paywalled.
 
-Verified baseline commit [1079177](https://github.com/mirel2505/irpat-efficiency/commit/107917792cdccb3e0ffcd843385ed97a21050073), 2026-11-27: 306 Python tests, 17 static contracts, 7 JavaScript class tests, 7 real Core tests on each of 2026.10.4 and 2026.11.2, 2 Chromium scenarios with synthetic HA responses, and package validation. Native encrypted and unencrypted archive recovery passed on synthetic files in isolated directories; this is not an HAOS restart/restore test. Full integrated browser session and real installation validation remain open. See the Actions runs and ROADMAP.md. No stable release.
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Support%20development-FFDD00?style=flat-square&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/rmirel2505o)
 
-- [SPECIFICATION.md](SPECIFICATION.md) — original full product requirements
-- [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) — current scope, gaps, release gates
-- [ARCHITECTURE.md](ARCHITECTURE.md) — architecture
-- [ALGORITHMS.md](ALGORITHMS.md) — algorithms
-- [ROADMAP.md](ROADMAP.md) — chronological development and verification record
+---
 
-## Susținere / Support
+<div align="center">
 
-Donațiile sunt voluntare și susțin timpul investit în dezvoltare, mentenanța și costurile instrumentelor și abonamentelor AI folosite în proiect. Funcționalitățile integrării nu sunt condiționate de donații.
+**THERMELYVO** · Simplicity. Balance. Efficiency.
 
-Voluntary donations support development, maintenance and AI tool subscription costs. No features are paywalled.
+Open source under the [GNU GPL v3.0](LICENSE).
 
-[Buy Me a Coffee](https://buymeacoffee.com/rmirel2505o)
-
-## License
-
-GNU General Public License v3.0. See [LICENSE](LICENSE).
+</div>

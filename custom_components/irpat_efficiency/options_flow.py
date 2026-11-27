@@ -183,9 +183,9 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
                     if self.config_entry.state is config_entries.ConfigEntryState.LOADED:
                         try:
                             if not await self.hass.config_entries.async_reload(self.config_entry.entry_id):
-                                raise RuntimeError("irPaT reload failed")
+                                raise RuntimeError("THERMELYVO reload failed")
                         except Exception:
-                            _LOGGER.exception("Configuration saved but irPaT reload failed")
+                            _LOGGER.exception("Configuration saved but THERMELYVO reload failed")
                             self._draft_error = "autosave_reload_failed"
                             return False
                 return True

@@ -1,5 +1,5 @@
 {
-  "title": "irPaT & Eficiență",
+  "title": "THERMELYVO",
   "config": {
     "step": {
       "user": {
@@ -168,7 +168,7 @@
         "title": "Adaugă sau alege nivel",
         "menu_options": {
           "floor_existing": "Alege nivel existent în Home Assistant",
-          "floor_custom": "Creează nivel propriu în irPaT"
+          "floor_custom": "Creează nivel propriu în THERMELYVO"
         }
       },
       "zone": {
@@ -183,7 +183,7 @@
         "title": "Adaugă sau alege încăpere",
         "menu_options": {
           "room_existing": "Alege încăpere existentă în Home Assistant",
-          "room_custom": "Creează încăpere proprie în irPaT"
+          "room_custom": "Creează încăpere proprie în THERMELYVO"
         }
       },
       "source": {
@@ -352,7 +352,7 @@
       },
       "floor_existing": {
         "title": "Alege nivel existent",
-        "description": "Reutilizează un nivel irPaT cu nume identic dacă este unic, păstrând identificatorul. Nu modifică registrele Home Assistant.",
+        "description": "Reutilizează un nivel THERMELYVO cu nume identic dacă este unic, păstrând identificatorul. Nu modifică registrele Home Assistant.",
         "data": {
           "ha_floor_id": "Nivel Home Assistant"
         }
@@ -565,10 +565,10 @@
       },
       "beta_reset": {
         "title": "Resetează întreaga configurație (Beta)",
-        "description": "Această operațiune aplică imediat o sesiune irPaT nouă: toate nivelurile, încăperile, zonele, distribuitoarele, circuitele, sursele, asocierile senzorilor, tarifele și ciorna activă sunt golite. Istoricul afișat pornește de la zero. Fișierele vechi rămân izolate pe disc și sunt incluse în backupurile native; nu este ștergere fizică și nu există anulare din interfață. Zonele, dispozitivele, entitățile, automatizările și celelalte integrări Home Assistant nu sunt modificate. Fă un backup înainte. Scrie RESET și confirmă. Integrarea se reîncarcă, fără repornirea intenționată a Core.",
+        "description": "Această operațiune aplică imediat o sesiune THERMELYVO nouă: toate nivelurile, încăperile, zonele, distribuitoarele, circuitele, sursele, asocierile senzorilor, tarifele și ciorna activă sunt golite. Istoricul afișat pornește de la zero. Fișierele vechi rămân izolate pe disc și sunt incluse în backupurile native; nu este ștergere fizică și nu există anulare din interfață. Zonele, dispozitivele, entitățile, automatizările și celelalte integrări Home Assistant nu sunt modificate. Fă un backup înainte. Scrie RESET și confirmă. Integrarea se reîncarcă, fără repornirea intenționată a Core.",
         "data": {
           "confirmation": "Scrie RESET",
-          "confirmed": "Confirm resetarea întregii configurații irPaT",
+          "confirmed": "Confirm resetarea întregii configurații THERMELYVO",
           "cancel": "Anulează și revino la meniu"
         }
       }
@@ -606,7 +606,7 @@
       "draft_conflict": "Configurația sau ciorna s-a schimbat în altă sesiune. Redeschide Configure pentru ultima ciornă.",
       "draft_read_failed": "Ciorna nu a putut fi citită. Verifică jurnalele Home Assistant.",
       "draft_write_failed": "Ultimul pas nu a putut fi salvat în ciornă. Pașii salvați anterior rămân; verifică jurnalele.",
-      "autosave_reload_failed": "Configurația a fost salvată, dar integrarea nu a putut fi reîncărcată. Verifică jurnalele și reîncarcă irPaT."
+      "autosave_reload_failed": "Configurația a fost salvată, dar integrarea nu a putut fi reîncărcată. Verifică jurnalele și reîncarcă THERMELYVO."
     }
   }
 }

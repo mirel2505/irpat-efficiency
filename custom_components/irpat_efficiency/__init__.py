@@ -110,6 +110,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         try:
             panel.async_remove(hass)
         except Exception:
-            _LOGGER.exception("Could not remove irPaT panel")
+            _LOGGER.exception("Could not remove THERMELYVO panel")
             return False
     return True

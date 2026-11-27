@@ -1,6 +1,6 @@
 {
   "domain": "irpat_efficiency",
-  "name": "irPaT & Eficiență",
+  "name": "THERMELYVO",
   "codeowners": [
     "@mirel2505"
   ],
@@ -10,7 +10,7 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/mirel2505/irpat-efficiency/issues",
   "requirements": [],
-  "version": "0.1.0.dev6",
+  "version": "0.1.0.dev7",
   "dependencies": [
     "frontend",
     "http",
