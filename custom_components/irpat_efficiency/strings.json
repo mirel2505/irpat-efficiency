@@ -65,6 +65,15 @@
         "pump": "Pump",
         "pressure": "Pressure"
       }
+    },
+    "fluid_type": {
+      "options": {
+        "unknown": "Unknown",
+        "water": "Water",
+        "propylene_glycol": "Propylene glycol mixture",
+        "ethylene_glycol": "Ethylene glycol mixture",
+        "other": "Other fluid"
+      }
     }
   },
   "options": {
@@ -84,7 +93,8 @@
           "outdoor": "Configure outdoor sensor",
           "telemetry_rooms": "Room sensors",
           "telemetry_sources": "Heat source sensors",
-          "telemetry_manifolds": "Manifold sensors"
+          "telemetry_manifolds": "Manifold sensors",
+          "source_settings": "Source properties and tariff"
         }
       },
       "floor": {
@@ -181,6 +191,25 @@
           "name": "Custom name (optional)",
           "entity_id": "Entity"
         }
+      },
+      "source_settings": {
+        "title": "Choose source",
+        "data": {
+          "source_id": "Heat source"
+        }
+      },
+      "source_properties": {
+        "title": "Fluid properties and costs",
+        "description": "Enter density and specific heat together from the fluid data at the relevant temperature. Empty optional fields remove values. Confirm only compatible measurement boundaries; this does not confirm actual operating mode. The tariff estimates cost of observed consumption.",
+        "data": {
+          "fluid_type": "Heat transfer fluid",
+          "density_kg_m3": "Density",
+          "cp_j_kgk": "Specific heat",
+          "tariff": "Electricity tariff / kWh",
+          "currency": "Currency code (e.g. EUR, RON)",
+          "power_boundary_confirmed": "Confirm compatible power measurements",
+          "energy_boundary_confirmed": "Confirm energy meter boundary"
+        }
       }
     },
     "error": {
@@ -194,7 +223,11 @@
       "invalid_entity": "Incompatible entity.",
       "duplicate_entity": "Sensor already associated.",
       "invalid_schema": "Incompatible configuration.",
-      "invalid_role": "Incompatible role."
+      "invalid_role": "Incompatible role.",
+      "invalid_fluid": "Invalid fluid.",
+      "invalid_fluid_properties": "Provide both valid properties for a known fluid.",
+      "invalid_tariff": "Invalid tariff or currency code.",
+      "invalid_boundary": "Invalid confirmation."
     }
   }
 }
