@@ -37,6 +37,7 @@ def ws_overview(hass, connection, msg):
         monitor = hass.data[DOMAIN]["defrost_monitors"].get(entry.entry_id)
         energy = hass.data[DOMAIN]["energy_monitors"].get(entry.entry_id)
         mode_monitor = hass.data[DOMAIN]["mode_monitors"].get(entry.entry_id)
+        reports = hass.data[DOMAIN]["report_stores"].get(entry.entry_id)
         rooms = read_rooms(hass, topology)
         telemetry = read_telemetry(hass, topology)
         modes = {}
@@ -57,6 +58,7 @@ def ws_overview(hass, connection, msg):
                          "telemetry": telemetry,
                          "reported_modes": modes,
                          "mode_history": mode_monitor.overview(topology) if mode_monitor else {},
+                         "building_reports": reports.overview() if reports else {},
                          "energy_history": energy.overview(topology, telemetry) if energy else {},
                          "energy_save_failed": energy.save_failed if energy else False,
                          "live_diagnostics": live_diagnostics(topology, telemetry, rooms, dt_util.utcnow().timestamp()),
