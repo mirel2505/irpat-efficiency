@@ -8,6 +8,8 @@ class IrpatEfficiencyPanel extends HTMLElement {
     this.error = false;
     this.loaded = false;
     this.busy = false;
+    this.displayMode = 'heating';
+    this.timer = null;
   }
 
   set hass(value) {
@@ -17,13 +19,19 @@ class IrpatEfficiencyPanel extends HTMLElement {
 
   connectedCallback() {
     this.render();
-    if (this._hass && !this.loaded && !this.busy) this.refresh();
+    if (this._hass && !this.busy) this.refresh();
+    if (this.timer === null) this.timer = setInterval(() => { if (!document.hidden) this.refresh(true); }, 30000);
   }
 
-  async refresh() {
+  disconnectedCallback() {
+    if (this.timer !== null) clearInterval(this.timer);
+    this.timer = null;
+  }
+
+  async refresh(quiet = false) {
     if (!this._hass || this.busy) return;
     this.busy = true;
-    this.render();
+    if (!quiet) this.render();
     try {
       this.entries = await this._hass.callWS({type:"irpat_efficiency/overview"});
       this.error = false;
@@ -33,7 +41,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
     } finally {
       this.loaded = true;
       this.busy = false;
-      this.render();
+      if (this.isConnected) this.render();
     }
   }
 
@@ -71,6 +79,9 @@ class IrpatEfficiencyPanel extends HTMLElement {
       .meter{width:20px;height:54px;border:2px solid #8796a5;border-radius:5px;margin:5px auto;background:repeating-linear-gradient(to bottom,transparent 0 8px,#8796a5 8px 9px)}
       .supply,.return{height:8px;border-radius:4px}.supply{background:#e57345}.return{background:#2196d3}
       .pipe{height:18px;width:4px;background:#8796a5;margin:auto}
+      .status-within{color:var(--success-color,#22a06b)}.status-warm{color:var(--error-color,#e57345)}.status-cold{color:#2196d3}
+      .temperature{text-align:right;flex-shrink:0}.temperature strong{font-size:1.2rem}.temperature small{display:block}
+      .mode{display:flex;gap:8px;margin:16px 0}.mode button[aria-pressed="false"]{background:var(--secondary-background-color);color:var(--primary-text-color)}
       .label{overflow-wrap:anywhere}.room{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--divider-color)}
       @media(max-width:600px){main{padding:12px}}
     `;
@@ -87,6 +98,14 @@ class IrpatEfficiencyPanel extends HTMLElement {
     const link = this.node("a",this.t("Configurează integrarea","Configure integration"),"action");
     link.href = "/config/integrations";
     main.append(link);
+    const modes = this.node("div",undefined,"mode");
+    for (const [key,ro,en] of [["heating","Încălzire","Heating"],["cooling","Răcire","Cooling"]]) {
+      const button=this.node("button",this.t(ro,en));
+      button.setAttribute("aria-pressed",String(this.displayMode===key));
+      button.addEventListener("click",()=>{this.displayMode=key;this.render();});
+      modes.append(button);
+    }
+    main.append(modes,this.node("p",this.t("Modul selectat schimbă doar ținta afișată, nu regimul instalației.","Selected mode changes only the displayed target, not the equipment mode."),"muted"));
     if (this.busy) main.append(this.node("p",this.t("Se încarcă…","Loading…")));
     if (this.error) main.append(this.node("p",this.t("Nu s-a putut încărca configurația. Încearcă din nou.","Could not load configuration. Try again.")));
     if (!this.busy && !this.error && !this.entries.length) main.append(this.node("p",this.t("Nu există o configurație activă.","No active configuration.")));
@@ -103,8 +122,27 @@ class IrpatEfficiencyPanel extends HTMLElement {
         section.append(this.node("h2",floor.name));
         for (const room of (t.rooms||[]).filter(r=>r.floor_id===floor.id)) {
           const row = this.node("div",undefined,"room");
-          const target = room.heating_target_c;
-          row.append(this.node("span",room.name,"label"),this.node("span",target==null?"—":this.t("Țintă ","Target ")+target+" °C"));
+          const sample = entry.room_temperatures?.[room.id];
+          const value = sample?.[this.displayMode];
+          const target = room[this.displayMode+"_target_c"];
+          const left = this.node("div",undefined,"label");
+          left.append(this.node("strong",room.name));
+          const details = this.node("details");
+          details.append(this.node("summary",this.t("Senzori","Sensors")+" "+(value?.valid_count??0)+"/"+(value?.configured_count??0)));
+          for(const reading of sample?.readings||[]){
+            const label = reading.name+": "+(reading.temperature_c==null?"—":reading.temperature_c.toFixed(1)+" °C");
+            const age = reading.age_seconds==null?"":this.t(" · raportat acum "," · reported ")+Math.floor(reading.age_seconds/60)+this.t(" min"," min ago");
+            details.append(this.node("div",label+age,"muted"));
+          }
+          left.append(details);
+          const right = this.node("div",undefined,"temperature");
+          const status = value?.status||"unknown";
+          const labels = {within:this.t("În toleranță","Within tolerance"),warm:this.t("Peste țintă","Above target"),cold:this.t("Sub țintă","Below target"),unknown:this.t("Date insuficiente","Insufficient data")};
+          const delta = value?.deviation_c;
+          right.append(this.node("strong",value?.temperature_c==null?"—":value.temperature_c.toFixed(1)+" °C","status-"+status),
+            this.node("small",target==null?this.t("Țintă nesetată","No target"):this.t("Țintă ","Target ")+target.toFixed(1)+" °C"),
+            this.node("small",labels[status]+(delta==null?"":" · "+(delta>0?"+":"")+delta.toFixed(1)+" °C"),"status-"+status));
+          row.append(left,right);
           section.append(row);
         }
         for (const manifold of (t.manifolds||[]).filter(m=>m.floor_id===floor.id)) {
@@ -125,7 +163,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
         main.append(section);
       }
     }
-    main.append(this.node("p",this.t("Debitele și temperaturile măsurate nu sunt încă disponibile în acest panou. Nu se transmit comenzi instalației.","Measured flows and temperatures are not yet available in this panel. No commands are sent to equipment."),"muted"));
+    main.append(this.node("p",this.t("Temperaturile sunt instantanee (media citirilor disponibile), cu toleranță provizorie ±0,3°C. Vechimea citirilor este afișată, dar nu este încă filtrată automat. Debitele și istoricul nu sunt încă disponibile. Nu se transmit comenzi instalației.","Temperatures are snapshots (mean of available readings), with provisional ±0.3°C tolerance. Reading age is shown but not yet automatically filtered. Flows and history are not yet available. No commands are sent to equipment."),"muted"));
     root.append(main);
   }
 }
