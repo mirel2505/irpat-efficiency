@@ -85,6 +85,45 @@
         "circuits": "Circuits",
         "bindings": "Room temperature sensors"
       }
+    },
+    "fuel_kind": {
+      "options": {
+        "natural_gas": "Natural gas",
+        "lpg": "LPG / propane",
+        "pellets": "Pellets",
+        "wood": "Wood",
+        "district_heat": "District heat",
+        "other": "Other"
+      }
+    },
+    "fuel_basis": {
+      "options": {
+        "HHV": "Higher heating value (HHV)",
+        "LHV": "Lower heating value (LHV)",
+        "delivered_heat": "Delivered heat"
+      }
+    },
+    "fuel_unit": {
+      "options": {
+        "kWh": "kWh",
+        "MWh": "MWh",
+        "Gcal": "Gcal",
+        "m3": "m³",
+        "L": "L",
+        "kg": "kg",
+        "t": "tonne",
+        "cylinder": "Cylinder",
+        "bag": "Bag"
+      }
+    },
+    "source_strategy": {
+      "options": {
+        "unknown": "Unknown",
+        "alternate": "Alternative",
+        "parallel": "Parallel",
+        "cascade": "Cascade",
+        "manual": "Manual"
+      }
     }
   },
   "options": {
@@ -111,7 +150,9 @@
           "remove": "Remove configuration object",
           "import_structure": "Import Home Assistant floors and areas",
           "discover_sensors": "Discover room sensors",
-          "discard_draft": "Discard draft (keep saved configuration)"
+          "discard_draft": "Discard draft (keep saved configuration)",
+          "economic_source": "Fuel and economic scenarios",
+          "hybrid_zone": "Hybrid operating strategy"
         }
       },
       "floor": {
@@ -348,6 +389,50 @@
         "data": {
           "confirmed": "Confirm discard"
         }
+      },
+      "economic_source": {
+        "title": "Choose economic source",
+        "data": {
+          "source_id": "Heat source"
+        }
+      },
+      "electric_scenario": {
+        "title": "Electric heating scenario",
+        "description": "Set the electricity tariff in Source properties. Enter a reviewed heating COP (or electric heater efficiency as a ratio) for the scenario. Not an automatically measured COP. Leave blank to remove the scenario.",
+        "data": {
+          "cop": "Reviewed COP / useful heat to electricity ratio"
+        }
+      },
+      "fuel_properties": {
+        "title": "Fuel billing and conversion",
+        "description": "Use the same HHV/LHV basis for all conversions and efficiency. kWh and MWh factors are automatic; other units require verified kWh per unit. Meter must be cumulative with the selected unit. Auxiliary electricity uses the separate source electricity tariff. Empty auxiliary value means unknown, not zero. Current tariff estimates are not invoices.",
+        "data": {
+          "kind": "Fuel type",
+          "basis": "Energy basis",
+          "billing_unit": "Billing unit",
+          "tariff": "Price per billing unit",
+          "fuel_currency": "Currency (ISO code)",
+          "billing_kwh_per_unit": "Energy per billed unit",
+          "meter_entity": "Cumulative fuel meter (optional)",
+          "meter_unit": "Meter unit",
+          "meter_kwh_per_unit": "Energy per meter unit",
+          "efficiency_percent": "Reviewed useful heat efficiency",
+          "auxiliary_kwh_per_heat_kwh": "Auxiliary electricity per useful kWh"
+        }
+      },
+      "hybrid_zone": {
+        "title": "Choose common hydraulic zone",
+        "data": {
+          "zone_id": "Hydraulic zone"
+        }
+      },
+      "hybrid_policy": {
+        "title": "Declared operating strategy",
+        "description": "For documentation and advisory analysis only. The outdoor threshold is your existing declared setpoint, not a command or automatically determined economic switching temperature. Actual mode is read separately.",
+        "data": {
+          "strategy": "Strategy",
+          "threshold_c": "Declared outdoor switch threshold"
+        }
       }
     },
     "error": {
@@ -372,7 +457,11 @@
       "remove_confirmation_required": "Explicit confirmation is required.",
       "registry_conflict": "Ambiguous local match. Rename the conflicting local objects before importing.",
       "registry_floor_required": "This area has no assigned floor. Add a local floor first or choose a fallback.",
-      "registry_confirmation_required": "Confirm the import explicitly."
+      "registry_confirmation_required": "Confirm the import explicitly.",
+      "invalid_fuel_unit": "Choose a supported unit.",
+      "invalid_fuel_factor": "Provide a consistent verified energy conversion factor for this unit.",
+      "invalid_fuel_basis": "Choose a valid energy basis for the fuel.",
+      "invalid_fuel_efficiency": "Check efficiency and HHV/LHV basis."
     },
     "abort": {
       "draft_conflict": "Configuration or draft changed in another session. Reopen Configure to continue from the latest checkpoint.",
