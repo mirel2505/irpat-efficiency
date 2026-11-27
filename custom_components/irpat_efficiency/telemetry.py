@@ -30,7 +30,14 @@ def set_binding(topology, group, owner_id, role, entity_id, name=None):
         raise ValueError('invalid_reference')
     data = deepcopy(topology)
     bindings = data.setdefault('telemetry', [])
+    previous = next((b for b in bindings if (b['group'], b['owner_id'], b['role']) == (group, owner_id, role)), None)
     bindings[:] = [b for b in bindings if (b['group'], b['owner_id'], b['role']) != (group, owner_id, role)]
+    if group == 'sources' and (previous or {}).get('entity_id') != entity_id:
+        source = next(s for s in data['sources'] if s['id'] == owner_id)
+        if role in ('electrical_power', 'thermal_power'):
+            source['power_boundary_confirmed'] = False
+        if role in ('electrical_energy', 'thermal_energy'):
+            source['energy_boundary_confirmed'] = False
     if entity_id is None:
         return data
     prefix = 'binary_sensor.' if role in BINARY else 'sensor.'
