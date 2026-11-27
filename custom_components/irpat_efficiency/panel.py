@@ -14,6 +14,7 @@ from .temperature_reader import read_rooms
 from .telemetry_reader import read_telemetry
 from .live_diagnostics import live_diagnostics
 from .operation_mode import classify_mode
+from .report_inputs import prepare_capture
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -147,6 +148,84 @@ async def ws_profile_create(hass, connection, msg):
     connection.send_result(msg["id"], result)
 
 
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/report_capture",
+    vol.Required("entry_id"): str,
+    vol.Required("name"): vol.All(str, vol.Length(min=1, max=120)),
+    vol.Required("start"): int,
+    vol.Required("end"): int,
+    vol.Required("boundary_id"): vol.All(str, vol.Length(min=1, max=120)),
+    vol.Required("thermal_kwh"): vol.Any(int, float),
+    vol.Optional("electric_kwh"): vol.Any(int, float),
+    vol.Required("reviewed"): bool,
+    vol.Optional("note", default=""): vol.All(str, vol.Length(max=2000)),
+})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_report_capture(hass, connection, msg):
+    """Capture retained temperatures and explicitly reviewed manual net heat."""
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    runtime = hass.data.get(DOMAIN, {})
+    reports = runtime.get("report_stores", {}).get(msg["entry_id"])
+    history = runtime.get("histories", {}).get(msg["entry_id"])
+    if entry is None or entry.domain != DOMAIN or reports is None or history is None:
+        connection.send_error(msg["id"], "not_found", "No active report history")
+        return
+    topology = entry.options.get("topology", empty_topology())
+    try:
+        if history.save_failed or history.configuration_hash != history.fingerprint(topology):
+            raise ValueError("configuration_changed")
+        inputs = prepare_capture(topology, history.data, msg["start"], msg["end"],
+                                 now=dt_util.utcnow().timestamp(),
+                                 configuration_since=history.configuration_since)
+        result = await reports.async_capture(
+            msg["name"], inputs["indoor"], inputs["outdoor"], msg["start"], msg["end"],
+            measurement_signature=inputs["measurement_signature"], room_ids=inputs["room_ids"],
+            boundary_id=msg["boundary_id"], thermal_kwh=msg["thermal_kwh"],
+            electric_kwh=msg.get("electric_kwh"), reviewed=msg["reviewed"], note=msg["note"])
+    except ValueError as exc:
+        connection.send_error(msg["id"], "invalid_observation", str(exc))
+        return
+    except Exception:
+        _LOGGER.exception("Could not save building observation")
+        connection.send_error(msg["id"], "save_failed", "Report save failed")
+        return
+    connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/report_compare",
+    vol.Required("entry_id"): str,
+    vol.Required("name"): vol.All(str, vol.Length(min=1, max=120)),
+    vol.Required("before_id"): str,
+    vol.Required("after_id"): str,
+    vol.Required("intervention_at"): vol.Any(int, float),
+    vol.Required("comparable"): bool,
+    vol.Optional("note", default=""): vol.All(str, vol.Length(max=2000)),
+})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_report_compare(hass, connection, msg):
+    """Compare saved server-side observations; never accept client-computed values."""
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    reports = hass.data.get(DOMAIN, {}).get("report_stores", {}).get(msg["entry_id"])
+    if entry is None or entry.domain != DOMAIN or reports is None:
+        connection.send_error(msg["id"], "not_found", "No active report store")
+        return
+    try:
+        result = await reports.async_compare(
+            msg["before_id"], msg["after_id"], name=msg["name"],
+            intervention_at=msg["intervention_at"], comparable=msg["comparable"], note=msg["note"])
+    except ValueError as exc:
+        connection.send_error(msg["id"], "invalid_comparison", str(exc))
+        return
+    except Exception:
+        _LOGGER.exception("Could not save building comparison")
+        connection.send_error(msg["id"], "save_failed", "Report save failed")
+        return
+    connection.send_result(msg["id"], result)
+
+
 async def async_register(hass):
     """Register the API and static asset once per HA runtime."""
     runtime = hass.data[DOMAIN]
@@ -159,6 +238,8 @@ async def async_register(hass):
         websocket_api.async_register_command(hass, ws_overview)
         websocket_api.async_register_command(hass, ws_journal_append)
         websocket_api.async_register_command(hass, ws_profile_create)
+        websocket_api.async_register_command(hass, ws_report_capture)
+        websocket_api.async_register_command(hass, ws_report_compare)
         runtime["api_registered"] = True
     if not runtime.get("panel_registered"):
         await panel_custom.async_register_panel(
