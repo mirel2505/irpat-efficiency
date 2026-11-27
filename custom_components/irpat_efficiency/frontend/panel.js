@@ -205,6 +205,66 @@ class IrpatEfficiencyPanel extends HTMLElement {
     return box;
   }
 
+  referenceProfiles(entry) {
+    const box=this.node("section",undefined,"card");
+    box.append(this.node("h2",this.t("Profiluri hidraulice de referință","Hydraulic reference profiles")));
+    const t=entry.topology;
+    const names=new Map((t.circuits||[]).map(c=>[c.id,c.name]));
+    const profiles=entry.profiles||[];
+    for(const p of profiles){
+      const detail=this.node("details",undefined,"journal");
+      detail.append(this.node("summary",p.name+" · "+p.mode+" · "+new Date(p.created_at).toLocaleString()));
+      for(const [id,v] of Object.entries(p.flows_lmin||{}))
+        detail.append(this.node("div",(names.get(id)||id)+": "+v.toFixed(2)+" l/min"));
+      detail.append(this.node("small",this.t("Valori istorice; nu reprezintă debite țintă obligatorii. Restaurarea se face doar manual.","Historical values, not mandatory flow targets. Restoration is manual only."),"muted"));
+      box.append(detail);
+    }
+    const create=this.node("details",undefined,"journal");
+    create.append(this.node("summary",this.t("Salvează profil din jurnal","Save a profile from journal")));
+    const form=this.node("form");
+    const name=this.node("input");name.required=true;name.maxLength=120;name.placeholder=this.t("Denumirea profilului","Profile name");
+    const nameLabel=this.node("label",this.t("Denumire","Name"));nameLabel.append(name);
+    const zone=this.node("select");zone.required=true;
+    for(const z of t.zones||[])zone.append(new Option(z.name,z.id));
+    const zoneLabel=this.node("label",this.t("Zonă","Zone"));zoneLabel.append(zone);
+    const selectors=this.node("div");const fields=[];
+    const rebuild=()=>{
+      selectors.replaceChildren();fields.length=0;
+      for(const m of (t.manifolds||[]).filter(x=>x.zone_id===zone.value)){
+        const label=this.node("label",m.name);
+        const select=this.node("select");select.required=true;
+        select.append(new Option(this.t("Alege observația","Choose observation"),""));
+        const ids=(t.circuits||[]).filter(c=>c.manifold_id===m.id).map(c=>c.id);
+        for(const s of (entry.journal||[]).filter(s=>s.manifold_id===m.id).slice().reverse()){
+          const flows=s.flows_lmin||{};
+          if(ids.length&&Object.keys(flows).length===ids.length&&ids.every(id=>Number.isFinite(flows[id])&&flows[id]>=0))
+            select.append(new Option(new Date(s.timestamp).toLocaleString(),s.id));
+        }
+        label.append(select);selectors.append(label);fields.push(select);
+      }
+    };
+    zone.addEventListener("change",rebuild);rebuild();
+    const mode=this.node("select");mode.append(new Option(this.t("Încălzire","Heating"),"heating"),new Option(this.t("Răcire","Cooling"),"cooling"));mode.value=this.displayMode;
+    const modeLabel=this.node("label",this.t("Regim de referință","Reference mode"));modeLabel.append(mode);
+    const submit=this.node("button",this.t("Salvează profilul","Save profile"));submit.type="submit";
+    const msg=this.node("p","");msg.setAttribute("role","status");
+    form.append(nameLabel,zoneLabel,modeLabel,selectors,submit,msg);
+    form.addEventListener("submit",async ev=>{
+      ev.preventDefault();
+      if(this.journalSaving||!this._hass)return;
+      if(!fields.length||fields.some(f=>!f.value)){msg.textContent=this.t("Sunt necesare observații complete pentru toate distribuitoarele.","Complete observations are required for all manifolds.");return;}
+      this.journalSaving=true;submit.disabled=true;
+      try{
+        await this._hass.callWS({type:"irpat_efficiency/profile_create",entry_id:entry.entry_id,zone_id:zone.value,name:name.value,mode:mode.value,snapshot_ids:fields.map(f=>f.value)});
+      }catch(error){msg.textContent=this.t("Salvarea nu a fost confirmată. Verifică lista înainte de reîncercare.","Save not confirmed. Check list before retrying.");return;}
+      finally{this.journalSaving=false;submit.disabled=false;}
+      await this.refresh();
+    });
+    create.append(form);box.append(create);
+    box.append(this.node("small",this.t("Profilul păstrează măsurători manuale, nu certifică echilibrarea. Observațiile pot fi din momente diferite.","A profile preserves manual readings, not balance certification. Observations may be from different times."),"muted"));
+    return box;
+  }
+
   render() {
     const root = this.shadowRoot;
     root.replaceChildren();
@@ -269,7 +329,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       const grid = this.node("div",undefined,"grid");
       for (const [key,ro,en] of [["floors","Niveluri","Floors"],["rooms","Încăperi","Rooms"],["manifolds","Distribuitoare","Manifolds"],["circuits","Circuite","Circuits"],["zones","Zone","Zones"],["sources","Surse","Sources"]])
         grid.append(this.card(this.t(ro,en),(t[key]||[]).length));
-      main.append(grid,this.thermalDiagnostics(entry));
+      main.append(grid,this.thermalDiagnostics(entry),this.referenceProfiles(entry));
       const rooms = new Map((t.rooms||[]).map(r=>[r.id,r]));
       for (const floor of t.floors||[]) {
         const section = this.node("section",undefined,"card");
