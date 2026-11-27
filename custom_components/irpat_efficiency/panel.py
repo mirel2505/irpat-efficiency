@@ -16,6 +16,7 @@ from .live_diagnostics import live_diagnostics
 from .operation_mode import classify_mode
 from .report_inputs import prepare_capture
 from .profile_review import review_profile
+from .thermal_review import review_curve, review_inertia
 from .data_export import CSV_SECTIONS, capture as capture_export, serialize as serialize_export
 
 _LOGGER = logging.getLogger(__name__)
@@ -294,6 +295,66 @@ def ws_profile_review(hass, connection, msg):
     connection.send_result(msg["id"], result)
 
 
+def _thermal_review_inputs(hass, entry_id):
+    runtime = hass.data.get(DOMAIN, {})
+    entry = hass.config_entries.async_get_entry(entry_id)
+    if (entry is None or entry.domain != DOMAIN
+            or entry_id not in runtime.get("active_entries", set())):
+        raise ValueError("inactive_entry")
+    history = runtime.get("histories", {}).get(entry_id)
+    journal = runtime.get("journals", {}).get(entry_id)
+    topology = entry.options.get("topology", empty_topology())
+    if (history is None or journal is None or history.save_failed
+            or history.configuration_hash != history.fingerprint(topology)):
+        raise ValueError("configuration_changed")
+    return topology, history, journal
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/curve_review",
+    vol.Required("entry_id"): str,
+    vol.Required("zone_id"): str,
+    vol.Required("end"): int,
+    vol.Required("starts"): [int],
+    vol.Required("reviewed"): bool,
+})
+@websocket_api.require_admin
+@callback
+def ws_curve_review(hass, connection, msg):
+    try:
+        topology, history, journal = _thermal_review_inputs(hass, msg["entry_id"])
+        result = review_curve(topology, history.data, journal.entries, msg["zone_id"],
+                              msg["end"], msg["starts"], now=dt_util.utcnow().timestamp(),
+                              since=history.configuration_since, reviewed=msg["reviewed"])
+    except ValueError as exc:
+        connection.send_error(msg["id"], "invalid_review", str(exc))
+        return
+    connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/inertia_review",
+    vol.Required("entry_id"): str,
+    vol.Required("room_id"): str,
+    vol.Required("start"): int,
+    vol.Required("end"): int,
+    vol.Required("heat_off_confirmed"): bool,
+    vol.Required("comparable"): bool,
+})
+@websocket_api.require_admin
+@callback
+def ws_inertia_review(hass, connection, msg):
+    try:
+        topology, history, _ = _thermal_review_inputs(hass, msg["entry_id"])
+        result = review_inertia(topology, history.data, msg["room_id"], msg["start"], msg["end"],
+                                now=dt_util.utcnow().timestamp(), since=history.configuration_since,
+                                heat_off_confirmed=msg["heat_off_confirmed"], comparable=msg["comparable"])
+    except ValueError as exc:
+        connection.send_error(msg["id"], "invalid_review", str(exc))
+        return
+    connection.send_result(msg["id"], result)
+
+
 async def async_register(hass):
     """Register the API and static asset once per HA runtime."""
     runtime = hass.data[DOMAIN]
@@ -307,6 +368,8 @@ async def async_register(hass):
         websocket_api.async_register_command(hass, ws_journal_append)
         websocket_api.async_register_command(hass, ws_profile_create)
         websocket_api.async_register_command(hass, ws_profile_review)
+        websocket_api.async_register_command(hass, ws_curve_review)
+        websocket_api.async_register_command(hass, ws_inertia_review)
         websocket_api.async_register_command(hass, ws_report_capture)
         websocket_api.async_register_command(hass, ws_report_compare)
         websocket_api.async_register_command(hass, ws_export_data)
