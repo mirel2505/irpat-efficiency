@@ -10,6 +10,7 @@ from homeassistant.helpers import selector
 from .const import OPERATING_MODES, CIRCUIT_CONTROLS
 from .topology import SOURCE_TYPES, TopologyError, add_item, empty_topology
 from .telemetry import ROLE_GROUPS, set_binding
+from .source_settings import FLUID_TYPES, set_source_settings
 
 
 def _choices(values, translation_key):
@@ -32,6 +33,8 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
             menu.append("room")
         if t["zones"]:
             menu.append("source")
+        if t["sources"]:
+            menu.append("source_settings")
         if t["floors"] and t["zones"]:
             menu.append("manifold")
         if t["manifolds"]:
@@ -168,6 +171,43 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_telemetry_manifolds(self, user_input=None):
         return await self._telemetry("manifolds", user_input)
+
+    async def async_step_source_settings(self, user_input=None):
+        if user_input is not None:
+            self._settings_source = user_input["source_id"]
+            return await self.async_step_source_properties()
+        return self.async_show_form(step_id="source_settings", data_schema=vol.Schema({
+            vol.Required("source_id"): self._reference("sources"),
+        }))
+
+    async def async_step_source_properties(self, user_input=None):
+        source = next((s for s in self._topology["sources"] if s["id"] == self._settings_source), None)
+        if source is None:
+            return await self.async_step_source_settings()
+        errors = {}
+        if user_input is not None:
+            try:
+                self._topology = set_source_settings(self._topology, source["id"], **user_input)
+                return await self.async_step_init()
+            except ValueError as exc:
+                errors["base"] = str(exc)
+        fields = {
+            vol.Required("fluid_type", default=source.get("fluid_type", "unknown")):
+                _choices(FLUID_TYPES, "fluid_type"),
+            vol.Required("power_boundary_confirmed", default=source.get("power_boundary_confirmed", False)): selector.BooleanSelector(),
+            vol.Required("energy_boundary_confirmed", default=source.get("energy_boundary_confirmed", False)): selector.BooleanSelector(),
+        }
+        for key, minimum, maximum, step, unit in (
+            ("density_kg_m3", 1, 3000, 0.1, "kg/m³"),
+            ("cp_j_kgk", 1, 10000, 1, "J/(kg·K)"),
+            ("tariff", 0, 100000, 0.001, None),
+        ):
+            fields[vol.Optional(key)] = selector.NumberSelector(selector.NumberSelectorConfig(
+                min=minimum, max=maximum, step=step, mode=selector.NumberSelectorMode.BOX,
+                unit_of_measurement=unit))
+        fields[vol.Optional("currency")] = selector.TextSelector()
+        schema = self.add_suggested_values_to_schema(vol.Schema(fields), source)
+        return self.async_show_form(step_id="source_properties", data_schema=schema, errors=errors)
 
     async def async_step_save(self, user_input=None):
         return self.async_create_entry(title="", data={
