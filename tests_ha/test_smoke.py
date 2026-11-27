@@ -1,4 +1,5 @@
 """Run against real Home Assistant Core, not stubbed integration modules."""
+import json
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
@@ -32,6 +33,20 @@ async def test_setup_overview_reload(hass: HomeAssistant, hass_ws_client, enable
     assert overview['room_temperatures'][room]['heating']['temperature_c'] == 21.5
     assert overview['defrost'] == {}
     assert overview['energy_history'] == {}
+    await client.send_json({'id': 10, 'type': f'{DOMAIN}/export_data',
+                            'entry_id': entry.entry_id, 'format': 'json'})
+    exported = await client.receive_json()
+    assert exported['success'], exported
+    archive = json.loads(exported['result']['content'])
+    assert archive['format'] == 'irpat_efficiency.export'
+    assert archive['entry_id'] == entry.entry_id
+    assert archive['topology'] == topology
+    assert archive['restore_supported'] is False
+    await client.send_json({'id': 11, 'type': f'{DOMAIN}/export_data',
+                            'entry_id': entry.entry_id, 'format': 'csv', 'section': 'temperatures'})
+    exported = await client.receive_json()
+    assert exported['success'], exported
+    assert exported['result']['mime'] == 'text/csv'
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.LOADED
@@ -46,3 +61,8 @@ async def test_setup_overview_reload(hass: HomeAssistant, hass_ws_client, enable
     response = await client.receive_json()
     assert response['success'], response
     assert response['result'] == []
+    await client.send_json({'id': 12, 'type': f'{DOMAIN}/export_data',
+                            'entry_id': entry.entry_id, 'format': 'json'})
+    exported = await client.receive_json()
+    assert not exported['success']
+    assert exported['error']['code'] == 'not_found'
