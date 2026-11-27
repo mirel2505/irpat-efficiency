@@ -16,6 +16,8 @@ from .topology_edit import EDIT_FIELDS, OPTIONAL_FIELDS, edit_item
 from .topology_remove import remove_item
 from .telemetry import ROLE_GROUPS, set_binding
 from .source_settings import FLUID_TYPES, set_source_settings
+from .fuel_economics import (FUEL_KINDS, UNITS, BASES, STRATEGIES, configure_fuel,
+                            configure_electric_scenario, configure_strategy)
 from .operation_mode import MODES, configure_mode
 from .ha_registry_reader import read_structure, read_entities
 from .registry_import import import_floor, import_room, import_all, sensor_candidates, confirm_sensors
@@ -71,6 +73,9 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
         if t["sources"]:
             menu.append("source_settings")
             menu.append("mode_source")
+            menu.append("economic_source")
+        if any(sum(z["id"] in src["zone_ids"] for src in t["sources"]) > 1 for z in t["zones"]):
+            menu.append("hybrid_zone")
         if t["floors"] and t["zones"]:
             menu.append("manifold")
         if t["manifolds"]:
@@ -120,8 +125,10 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
                         if (self.config_entry.options.get("topology", empty_topology()) != self._base
                                 or await self._draft_store.async_load() != self._last_draft):
                             return self.async_abort(reason="draft_conflict")
-                        await self._draft_store.async_remove()
-                        self._last_draft = None
+                        # A durable base checkpoint avoids stale Store caches on older Core.
+                        cleared = {"base": deepcopy(self._base), "topology": deepcopy(self._base)}
+                        await self._draft_store.async_save(cleared)
+                        self._last_draft = cleared
                     except Exception:
                         _LOGGER.exception("Could not discard configuration draft")
                         return self.async_abort(reason="draft_write_failed")
@@ -470,6 +477,101 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_telemetry_manifolds(self, user_input=None):
         return await self._telemetry("manifolds", user_input)
+
+    async def async_step_economic_source(self, user_input=None):
+        sources = {s["id"]: s["name"] for s in self._topology["sources"]
+                   if s["source_type"] in ("heat_pump", "electric", "gas", "biomass", "district", "other")}
+        if not sources:
+            return await self.async_step_init()
+        if user_input is not None and user_input.get("source_id") in sources:
+            self._economic_source = user_input["source_id"]
+            s = next(s for s in self._topology["sources"] if s["id"] == self._economic_source)
+            if s["source_type"] in ("heat_pump", "electric"):
+                return await self.async_step_electric_scenario()
+            return await self.async_step_fuel_properties()
+        return self.async_show_form(step_id="economic_source", data_schema=vol.Schema({
+            vol.Required("source_id"): self._native_selector(sources),
+        }), errors={"base": "invalid_reference"} if user_input is not None else {})
+
+    async def async_step_electric_scenario(self, user_input=None):
+        source = next(s for s in self._topology["sources"] if s["id"] == self._economic_source)
+        errors = {}
+        if user_input is not None:
+            try:
+                self._topology = configure_electric_scenario(self._topology, source["id"], user_input.get("cop"))
+                return await self.async_step_init()
+            except ValueError as exc:
+                errors["base"] = str(exc)
+        fields = {vol.Optional("cop"): selector.NumberSelector(selector.NumberSelectorConfig(
+            min=0.1, max=20, step=0.01, mode=selector.NumberSelectorMode.BOX))}
+        suggested = {"cop": source["scenario_cop"]} if source.get("scenario_cop") is not None else {}
+        return self.async_show_form(step_id="electric_scenario",
+            data_schema=self.add_suggested_values_to_schema(vol.Schema(fields), suggested), errors=errors)
+
+    async def async_step_fuel_properties(self, user_input=None):
+        source = next(s for s in self._topology["sources"] if s["id"] == self._economic_source)
+        fuel = source.get("fuel", {})
+        errors = {}
+        if user_input is not None:
+            try:
+                self._topology = configure_fuel(self._topology, source["id"], **user_input)
+                return await self.async_step_init()
+            except ValueError as exc:
+                errors["base"] = str(exc)
+        defaults = {"gas": "natural_gas", "biomass": "pellets", "district": "district_heat"}
+        kind = fuel.get("kind", defaults.get(source["source_type"], "other"))
+        fields = {
+            vol.Required("kind", default=kind): _choices(FUEL_KINDS, "fuel_kind"),
+            vol.Required("basis", default=fuel.get("basis", "delivered_heat" if kind == "district_heat" else "HHV")):
+                _choices(BASES, "fuel_basis"),
+            vol.Required("billing_unit", default=fuel.get("billing_unit", "kWh")): _choices(UNITS, "fuel_unit"),
+            vol.Required("tariff"): selector.NumberSelector(selector.NumberSelectorConfig(
+                min=0, max=1000000, step=0.001, mode=selector.NumberSelectorMode.BOX)),
+            vol.Required("fuel_currency", default=fuel.get("currency", source.get("currency") or "RON")): selector.TextSelector(),
+            vol.Optional("meter_entity"): selector.EntitySelector(selector.EntitySelectorConfig(filter=[{"domain": "sensor"}])),
+            vol.Optional("meter_unit"): _choices(UNITS, "fuel_unit"),
+        }
+        for key, minimum, maximum, step, unit in (
+            ("billing_kwh_per_unit", .001, 1e9, .001, "kWh/unit"),
+            ("meter_kwh_per_unit", .001, 1e9, .001, "kWh/unit"),
+            ("efficiency_percent", .1, 120, .1, "%"),
+            ("auxiliary_kwh_per_heat_kwh", 0, 10, .001, "kWh/kWh"),
+        ):
+            fields[vol.Optional(key)] = selector.NumberSelector(selector.NumberSelectorConfig(
+                min=minimum, max=maximum, step=step, mode=selector.NumberSelectorMode.BOX, unit_of_measurement=unit))
+        suggested = {k: v for k,v in fuel.items() if v is not None}
+        return self.async_show_form(step_id="fuel_properties",
+            data_schema=self.add_suggested_values_to_schema(vol.Schema(fields), suggested), errors=errors)
+
+    async def async_step_hybrid_zone(self, user_input=None):
+        zones = {z["id"]: z["name"] for z in self._topology["zones"]
+                 if sum(z["id"] in s["zone_ids"] for s in self._topology["sources"]) > 1}
+        if not zones:
+            return await self.async_step_init()
+        if user_input is not None and user_input.get("zone_id") in zones:
+            self._hybrid_zone = user_input["zone_id"]
+            return await self.async_step_hybrid_policy()
+        return self.async_show_form(step_id="hybrid_zone", data_schema=vol.Schema({
+            vol.Required("zone_id"): self._native_selector(zones),
+        }), errors={"base": "invalid_reference"} if user_input is not None else {})
+
+    async def async_step_hybrid_policy(self, user_input=None):
+        zone = next(z for z in self._topology["zones"] if z["id"] == self._hybrid_zone)
+        errors = {}
+        if user_input is not None:
+            try:
+                self._topology = configure_strategy(self._topology, zone["id"], user_input["strategy"], user_input.get("threshold_c"))
+                return await self.async_step_init()
+            except ValueError as exc:
+                errors["base"] = str(exc)
+        fields = {
+            vol.Required("strategy", default=zone.get("source_strategy", "unknown")): _choices(STRATEGIES, "source_strategy"),
+            vol.Optional("threshold_c"): selector.NumberSelector(selector.NumberSelectorConfig(
+                min=-60, max=50, step=.1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="°C")),
+        }
+        suggested = {"threshold_c": zone["declared_switch_c"]} if zone.get("declared_switch_c") is not None else {}
+        return self.async_show_form(step_id="hybrid_policy",
+            data_schema=self.add_suggested_values_to_schema(vol.Schema(fields), suggested), errors=errors)
 
     async def async_step_source_settings(self, user_input=None):
         if user_input is not None:
