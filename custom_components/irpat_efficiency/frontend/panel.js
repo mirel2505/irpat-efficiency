@@ -415,6 +415,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
     const box=this.node("details",undefined,"card journal");
     box.append(this.node("summary",this.t("Export date","Export data")));
     box.append(this.node("p",this.t("Fișierele includ date private despre instalație. Exportul JSON este o arhivă de analiză, nu un backup restaurabil. În CSV, energia asociată este un subset al consumului total; nu aduna aceste rânduri.","Files include private installation information. JSON is an analysis archive, not a restorable backup. Matched energy in CSV is a subset of total consumption; do not add these rows together."),"muted"));
+    box.append(this.node("p",this.t("Backup restaurabil: deschide Settings → System → Backups în Home Assistant și include setările Home Assistant. Restaurarea poate înlocui și alte setări ale sistemului; efectueaz-o numai după verificarea conținutului și păstrarea unui backup actual.","Restorable backup: open Settings → System → Backups in Home Assistant and include Home Assistant settings. Restoration may replace other system settings; restore only after reviewing the contents and keeping a current backup."),"muted"));
     const select=this.node("select");
     for(const [value,ro,en] of [
       ["json","Arhivă JSON","JSON archive"],["temperatures","Temperaturi CSV","Temperatures CSV"],
