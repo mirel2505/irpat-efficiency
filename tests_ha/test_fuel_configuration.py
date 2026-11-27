@@ -28,6 +28,7 @@ async def test_fuel_configuration_and_meter(hass, enable_custom_integrations, ha
     await hass.async_block_till_done()
     manager = hass.config_entries.options
     result = await manager.async_init(entry.entry_id)
+    result = await manager.async_configure(result["flow_id"], {"next_step_id": "all_actions"})
     fid = result["flow_id"]
     assert "economic_source" in result["menu_options"] and "hybrid_zone" in result["menu_options"]
     result = await manager.async_configure(fid, {"next_step_id": "economic_source"})
