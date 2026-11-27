@@ -158,9 +158,11 @@ class IrpatEfficiencyPanel extends HTMLElement {
           if(hist){
             const format=v=>v==null?"—":v.toFixed(1)+" °C";
             const prev=hist.yesterday_same_slot_c;
+            const readings=sample?.readings||[];
+            const fresh=readings.length>0&&readings.every(r=>r.temperature_c!=null&&r.age_seconds!=null&&r.age_seconds<=7200);
             const historyBox=this.node("div",undefined,"history");
             const cells=[[this.t("Ieri, aceeași oră (5 min)","Yesterday, same time (5 min)"),format(prev)],
-              [this.t("Diferență față de ieri","Difference from yesterday"),prev==null||value?.temperature_c==null?"—":format(value.temperature_c-prev)],
+              [this.t("Diferență față de ieri","Difference from yesterday"),!fresh||prev==null||value?.temperature_c==null?"—":format(value.temperature_c-prev)],
               [this.t("Medie eșantioane","Sample mean"),format(stats?.mean_c)],
               [this.t("Min. / Max.","Min. / Max."),format(stats?.min_c)+" / "+format(stats?.max_c)],
               [this.t("Acoperire","Coverage"),stats?.coverage==null?"—":Math.round(stats.coverage*100)+"% ("+stats.count+"/"+stats.expected+")"]];
