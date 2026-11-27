@@ -74,6 +74,17 @@
         "ethylene_glycol": "Ethylene glycol mixture",
         "other": "Other fluid"
       }
+    },
+    "edit_collection": {
+      "options": {
+        "floors": "Floors",
+        "zones": "Hydraulic zones",
+        "sources": "Heat sources",
+        "rooms": "Rooms",
+        "manifolds": "Manifolds",
+        "circuits": "Circuits",
+        "bindings": "Room temperature sensors"
+      }
     }
   },
   "options": {
@@ -95,7 +106,8 @@
           "telemetry_sources": "Heat source sensors",
           "telemetry_manifolds": "Manifold sensors",
           "source_settings": "Source properties and tariff",
-          "mode_source": "Reported source mode"
+          "mode_source": "Reported source mode",
+          "edit": "Edit existing configuration"
         }
       },
       "floor": {
@@ -230,6 +242,33 @@
           "defrost": "Defrost",
           "off": "Off"
         }
+      },
+      "edit": {
+        "title": "Edit existing configuration",
+        "data": {
+          "collection": "Object type"
+        }
+      },
+      "edit_select": {
+        "title": "Choose existing object",
+        "data": {
+          "item_id": "Object"
+        }
+      },
+      "edit_item": {
+        "title": "Edit object",
+        "description": "Changes apply only after Save configuration. IDs and recorded observations are retained. Temperature history comparisons restart under the changed configuration; use the same physical circuit when correcting its position. Empty optional numeric fields remove their values.",
+        "data": {
+          "name": "Custom name",
+          "operating_mode": "Operating mode",
+          "circuit_control": "Circuit control",
+          "area_m2": "Area",
+          "heating_target_c": "Heating target",
+          "cooling_target_c": "Cooling target",
+          "position": "Position from left to right",
+          "length_m": "Circuit length",
+          "entity_id": "Sensor or thermostat"
+        }
       }
     },
     "error": {
@@ -248,7 +287,8 @@
       "invalid_fluid_properties": "Provide both valid properties for a known fluid.",
       "invalid_tariff": "Invalid tariff or currency code.",
       "invalid_boundary": "Invalid confirmation.",
-      "invalid_mode_mapping": "Provide at least one valid, distinct raw state value."
+      "invalid_mode_mapping": "Provide at least one valid, distinct raw state value.",
+      "unsupported_edit": "This structural change requires a new object."
     }
   }
 }
