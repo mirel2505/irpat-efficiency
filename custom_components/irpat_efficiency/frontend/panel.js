@@ -156,6 +156,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
     const labels={
       configuration_collecting:this.t("Colectare după configurare sau salvare nereușită","Collecting after configuration or save failure"),
       shared_rooms:this.t("Încăperi deservite de mai multe zone; analiză separată suspendată","Rooms served by multiple zones; separate analysis suspended"),
+      duplicate_temperature_sensor:this.t("Senzor de temperatură reutilizat; analiza independentă este suspendată","Reused temperature sensor; independent analysis suspended"),
       monitor_only:this.t("Doar monitorizare","Monitoring only"),
       settling:this.t("În stabilizare după observația de reglaj","Settling after adjustment observation"),
       insufficient_data:this.t("Date insuficiente","Insufficient data"),
