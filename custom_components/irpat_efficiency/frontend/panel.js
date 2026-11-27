@@ -149,6 +149,47 @@ class IrpatEfficiencyPanel extends HTMLElement {
     return box;
   }
 
+  thermalDiagnostics(entry) {
+    const box=this.node("section",undefined,"card");
+    box.append(this.node("h2",this.t("Analiză termică pe zone · 24 h","Thermal diagnostics by zone · 24 h")));
+    const zones=Object.values(entry.thermal_diagnostics?.[this.displayMode]||{});
+    const labels={
+      configuration_collecting:this.t("Colectare după configurare sau salvare nereușită","Collecting after configuration or save failure"),
+      shared_rooms:this.t("Încăperi deservite de mai multe zone; analiză separată suspendată","Rooms served by multiple zones; separate analysis suspended"),
+      monitor_only:this.t("Doar monitorizare","Monitoring only"),
+      settling:this.t("În stabilizare după observația de reglaj","Settling after adjustment observation"),
+      insufficient_data:this.t("Date insuficiente","Insufficient data"),
+      observed:this.t("Observație statistică","Statistical observation")
+    };
+    const patterns={
+      mixed:this.t("Abatere comună și diferențe locale","Common error and local differences"),
+      distribution:this.t("Diferențe între încăperi","Differences between rooms"),
+      common:this.t("Abatere generală","Common error"),
+      near_targets:this.t("Medii apropiate de ținte","Means near targets")
+    };
+    const format=v=>v==null?"—":(v>0?"+":"")+v.toFixed(2)+" °C";
+    const names=new Map((entry.topology.rooms||[]).map(r=>[r.id,r.name]));
+    for(const zone of zones){
+      box.append(this.node("h3",zone.name),this.node("p",labels[zone.status]||zone.status));
+      if(zone.status==="observed"||zone.status==="insufficient_data")
+        box.append(this.node("small",this.t("Acoperire comună: ","Common coverage: ")+Math.round(zone.coverage*100)+"%","muted"));
+      if(zone.status==="observed"){
+        box.append(this.node("p",patterns[zone.pattern]||zone.pattern),
+          this.node("p",this.t("Abatere generală: ","Common error: ")+format(zone.common_error_c)));
+        box.append(this.node("small",zone.weighting==="area"?this.t("Ponderare după suprafață","Area weighting"):this.t("Ponderare egală pe încăperi","Equal room weighting"),"muted"));
+        for(const [id,r] of Object.entries(zone.rooms)){
+          const row=this.node("div",undefined,"room");
+          row.append(this.node("span",names.get(id)||id),
+            this.node("span",this.t("Abatere ","Error ")+format(r.mean_error_c)+" · "+this.t("Rezidual ","Residual ")+format(r.residual_c)+" · "+Math.round(r.within_fraction*100)+"% "+this.t("în toleranță","within tolerance")));
+          box.append(row);
+        }
+      }
+    }
+    if(!zones.length)box.append(this.node("p",this.t("Nicio zonă disponibilă.","No available zones.")));
+    box.append(this.node("p",this.t("Rezultate descriptive pentru ținta selectată; regimul real, vremea și perturbările nu sunt încă validate. Nu reprezintă recomandări de reglaj sau confirmarea echilibrării.","Descriptive results for the selected target; actual operating mode, weather and disturbances are not yet validated. These are not adjustment recommendations or balance confirmation."),"muted"));
+    return box;
+  }
+
   render() {
     const root = this.shadowRoot;
     root.replaceChildren();
@@ -213,7 +254,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       const grid = this.node("div",undefined,"grid");
       for (const [key,ro,en] of [["floors","Niveluri","Floors"],["rooms","Încăperi","Rooms"],["manifolds","Distribuitoare","Manifolds"],["circuits","Circuite","Circuits"],["zones","Zone","Zones"],["sources","Surse","Sources"]])
         grid.append(this.card(this.t(ro,en),(t[key]||[]).length));
-      main.append(grid);
+      main.append(grid,this.thermalDiagnostics(entry));
       const rooms = new Map((t.rooms||[]).map(r=>[r.id,r]));
       for (const floor of t.floors||[]) {
         const section = this.node("section",undefined,"card");
