@@ -847,9 +847,9 @@ class IrpatEfficiencyPanel extends HTMLElement {
     const within=targets.filter(v=>Math.abs(v.deviation_c)<=.3+1e-9).length;
     const heading=this.node("div",undefined,"hero-heading");heading.append(this.icon("home"),this.node("h2",this.t("Echilibrul casei","Home comfort")));box.append(heading);
     const stats=this.node("div",undefined,"comfort-grid");
-    const metric=(icon,label,value,sub)=>{const e=this.node("div",undefined,"comfort-metric");e.append(this.icon(icon),this.node("small",label),this.node("strong",value),this.node("small",sub));return e;};
+    const metric=(icon,label,value,sub)=>{const e=this.node("div",undefined,"comfort-metric tone-"+icon);const title=this.node("div",undefined,"metric-title");title.append(this.icon(icon),this.node("small",label));e.append(title,this.node("strong",value),this.node("small",sub,"metric-sub"));return e;};
     const mean=known.length?known.reduce((a,v)=>a+v.temperature_c,0)/known.length:null;
-    stats.append(metric("sensor",this.t("Temperatură medie","Average temperature"),mean==null?"—":mean.toFixed(1)+"°",known.length+"/"+t.rooms.length+" "+this.t("camere","rooms")),metric("target",this.t("În toleranță","On target"),within+"/"+targets.length,this.t("±0,3°C · citiri actuale","±0.3°C · current readings")));
+    stats.append(metric("sensor",this.t("Interior","Inside"),mean==null?"—":mean.toFixed(1)+"°",known.length+"/"+t.rooms.length+" "+this.t("camere","rooms")),metric("target",this.t("În toleranță","On target"),within+"/"+targets.length,this.t("±0,3°C · citiri actuale","±0.3°C · current readings")));
     const out=entry.outdoor?.reading, hist=entry.outdoor?.history?.windows?.["24"];
     stats.append(metric("weather",this.t("Exterior","Outside"),out?.temperature_c==null?"—":out.temperature_c.toFixed(1)+"°",!out?this.t("Alege referința","Select a reference"):out.status==="reported"?out.name:this.t("Citire indisponibilă","Reading unavailable")));
     box.append(stats);
@@ -1009,7 +1009,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
     steps.forEach(([icon,label,done],i)=>{
       const b=this.setupButton(nav,label,()=>{this.setupStep=i;this.setupError='';this.render();},true);
       b.replaceChildren(this.icon(["home","rooms","sensor","loops","heat","check"][i]),this.node("span",label),this.node("small",done?this.t("Configurat","Configured"):this.t("De verificat","Review")));
-      b.setAttribute("aria-current",i===this.setupStep?"step":"false");
+      b.setAttribute("aria-current",i===this.setupStep?"step":"false");b.dataset.complete=String(done);b.setAttribute("aria-label",(i+1)+". "+label+" · "+(done?this.t("Configurat","Configured"):this.t("De verificat","Review")));
     });
     box.append(nav);
     const status=this.node("p",this.setupMessage,"status-within");
@@ -1058,7 +1058,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
         mf.finish();section.append(merge);
       }
       for(const floor of t.floors){
-        const row=this.node("div",undefined,"setup-item");row.append(this.node("strong","🏠 "+floor.name));
+        const row=this.node("details",undefined,"setup-item");row.append(this.node("summary",floor.name+" · "+t.rooms.filter(r=>r.floor_id===floor.id).length+" "+this.t("camere","rooms")));
         const f=this.setupForm(row,this.t("Aplică numele","Apply name"),()=>this.setupAction("rename",{collection:"floors",id:floor.id,name:name.value}));
         const name=this.setupField(f.form,this.t("Nume etaj","Floor name"),"text",floor.name);name.required=true;f.finish();
         row.append(this.node("small",t.rooms.filter(r=>r.floor_id===floor.id).length+" "+this.t("camere","rooms"),"muted"));
@@ -1098,10 +1098,9 @@ class IrpatEfficiencyPanel extends HTMLElement {
     if(this.setupStep===2){
       section.append(this.node("p",this.t("Alege senzorul care măsoară temperatura reală. ★ indică un senzor din aceeași încăpere Home Assistant.","Choose the sensor measuring the actual temperature. ★ indicates a sensor in the same Home Assistant area.")));
       for(const room of t.rooms){
-        const row=this.node("div",undefined,"setup-item");
+        const row=this.node("details",undefined,"setup-item sensor-item");
         const current=d.room_temperatures[room.id]?.heating?.temperature_c;
-        row.append(this.node("strong",room.name+" · "+(current==null?"—":current.toFixed(1)+" °C")));
-        const bindings=t.bindings.filter(b=>b.room_id===room.id);
+        const bindings=t.bindings.filter(b=>b.room_id===room.id);row.dataset.linked=String(bindings.length>0);row.append(this.node("summary",room.name+" · "+(current==null?"—":current.toFixed(1)+" °C")+" · "+bindings.length+" "+this.t("senzori","sensors")));
         if(!bindings.length)row.append(this.node("p",this.t("Niciun senzor asociat","No sensor linked"),"muted"));
         for(const binding of bindings){
           const reading=d.room_temperatures[room.id]?.readings?.find(x=>x.entity_id===binding.entity_id);
@@ -1130,7 +1129,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
         row.append(diagram);
         for(const c of circuits){
           const f=this.setupForm(row,this.t("Aplică asocierea","Apply mapping"),()=>this.setupAction("map_circuit",{id:c.id,room_id:sel.value||null}));
-          const sel=this.setupField(f.form,this.t("Circuit ","Loop ")+c.position,"select",c.room_id||"",[["",this.t("Neasociat","Unassigned")],...roomOptions]);f.finish();
+          f.form.classList.add("inline-form");const sel=this.setupField(f.form,this.t("Circuit ","Loop ")+c.position,"select",c.room_id||"",[["",this.t("Neasociat","Unassigned")],...roomOptions]);f.finish();
           this.setupRemove(row,"circuits",c.id,this.t("Circuit ","Loop ")+c.position);
         }
         row.append(this.node("small",this.t("Schimbarea camerei păstrează istoricul vechi separat.","Changing a room keeps the old history separate."),"muted"));
@@ -1315,11 +1314,43 @@ class IrpatEfficiencyPanel extends HTMLElement {
       @media(max-width:720px){.topology-grid,.setup-nav{grid-template-columns:repeat(3,minmax(0,1fr))}}
       @media(max-width:600px){main{padding:8px}.room{flex-wrap:nowrap}.temperature{text-align:right}.journal button,.mode button{min-height:44px}.flow-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
       @media(max-width:340px){.topology-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.room{flex-wrap:wrap}}
+
+      /* dev3: compact rows and semantic color accents */
+      :host{--ir-violet:#8b83e8;--ir-warm:#f09a50;--ir-cold:#55a9e9;--ir-good:#38b99a;--ir-accent:var(--ir-violet);font-size:14px;line-height:1.35}
+      main{padding:8px;max-width:1180px;background:radial-gradient(ellipse at 100% 0,color-mix(in srgb,var(--ir-violet) 12%,transparent),transparent 44%)}
+      header{gap:6px;margin-bottom:5px;flex-wrap:nowrap}.brand{display:flex;align-items:center;gap:6px;flex:1;min-width:0}.brand h1{font-size:1.05rem;line-height:1.2;flex:none}.brand .line-icon{width:20px;height:20px}.version-label{font-size:.66rem;color:var(--secondary-text-color);white-space:nowrap}
+      header button,button,a.action{padding:7px 10px;min-height:44px;border-radius:9px;font-size:.85rem}
+      .dashboard-controls{display:grid;gap:5px;margin:4px 0 7px}.setup-launch{width:fit-content;max-width:100%;background:color-mix(in srgb,var(--ir-violet) 19%,var(--card-background-color));color:var(--primary-text-color);border:1px solid color-mix(in srgb,var(--ir-violet) 45%,transparent)}
+      .dashboard-toggles{display:flex;gap:6px;flex-wrap:wrap}.dashboard-toggles>.mode{flex:1;display:flex;flex-wrap:nowrap;margin:0;gap:3px;background:color-mix(in srgb,var(--primary-text-color) 5%,transparent);border:1px solid var(--ir-edge);border-radius:10px;padding:2px;min-width:0}
+      .dashboard-toggles .mode button{flex:1;min-width:0;padding:5px 4px;white-space:nowrap;font-size:.78rem;background:transparent;color:var(--primary-text-color)}
+      .dashboard-toggles .mode button[aria-pressed=true]{background:color-mix(in srgb,var(--ir-violet) 24%,var(--card-background-color));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ir-violet) 55%,transparent)}
+      .thermal-mode button[aria-pressed=true]:first-child{background:color-mix(in srgb,var(--ir-warm) 22%,var(--card-background-color));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ir-warm) 50%,transparent)}
+      .thermal-mode button[aria-pressed=true]:last-child{background:color-mix(in srgb,var(--ir-cold) 22%,var(--card-background-color));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ir-cold) 50%,transparent)}
+      .installation-title{font-size:.83rem;margin:4px 2px;color:var(--secondary-text-color);font-weight:600}
+      .card{padding:8px;margin-bottom:7px;border-radius:12px;background:var(--ir-surface)}
+      .hero-heading{gap:6px}.hero-heading .line-icon{width:19px;height:19px}.hero-heading h2{margin:3px 0;font-size:1rem}
+      .balance-hero{border-top:2px solid var(--ir-violet)}.comfort-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:6px 0}
+      .comfort-metric{--tone:var(--ir-violet);padding:6px;gap:3px;min-width:0;border:1px solid color-mix(in srgb,var(--tone) 30%,transparent);background:linear-gradient(135deg,color-mix(in srgb,var(--tone) 15%,transparent),color-mix(in srgb,var(--tone) 4%,transparent));border-radius:9px}
+      .tone-sensor{--tone:var(--ir-warm)}.tone-target{--tone:var(--ir-good)}.tone-weather{--tone:var(--ir-cold)}
+      .metric-title{display:flex;align-items:center;gap:3px;min-width:0}.metric-title .line-icon{color:var(--tone);width:15px;height:15px}.metric-title small{font-size:.75rem;font-weight:600;color:var(--primary-text-color)}
+      .comfort-metric strong{font-size:1.35rem;line-height:1.15;color:var(--primary-text-color)}.metric-sub{font-size:.68rem;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+      .advice-card{border-left:3px solid var(--ir-violet)}.advice-card p{font-size:.86rem;margin:4px 0}.advice-zone{padding:5px 0}.advice-zone h3{margin:4px 0}.advice-line{padding:5px 0}.advice-line .line-icon{width:19px;height:19px}
+      .room-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,285px),1fr));gap:5px;margin:5px 0}.room-tile{--tone:var(--ir-violet);padding:0;margin:0;border:1px solid color-mix(in srgb,var(--tone) 23%,var(--ir-edge));border-inline-start:3px solid var(--tone);border-radius:9px;background:color-mix(in srgb,var(--tone) 7%,var(--card-background-color));min-width:0}
+      .room-tile[data-status=warm]{--tone:var(--ir-warm)}.room-tile[data-status=cold]{--tone:var(--ir-cold)}.room-tile[data-status=within]{--tone:var(--ir-good)}
+      .room-tile .room-detail{margin:0}.room-tile .room-detail>summary{display:block;list-style:none;padding:7px;min-height:48px;box-sizing:border-box;color:var(--primary-text-color);font-weight:400}.room-tile summary::-webkit-details-marker{display:none}
+      .room-tile .room{display:grid;grid-template-columns:19px minmax(0,1fr) auto;align-items:center;gap:6px;min-width:0}.room-tile .room>.line-icon{width:19px;height:19px;color:var(--tone)}.room-tile .label strong{font-size:.88rem}.room-tile .label small{display:block;font-size:.72rem;line-height:1.2}
+      .room-tile .temperature strong{font-size:1.15rem;line-height:1.2;font-variant-numeric:tabular-nums}.room-tile .temperature small{font-size:.69rem;line-height:1.2}.room-tile .temperature{text-align:right}.room-tile .room-detail> :not(summary){margin:6px 8px}.room-tile .room-detail[open]>summary{border-bottom:1px solid var(--ir-edge)}
+      .status-within{color:color-mix(in srgb,var(--ir-good) 72%,var(--primary-text-color))}.status-warm{color:color-mix(in srgb,var(--ir-warm) 72%,var(--primary-text-color))}.status-cold{color:color-mix(in srgb,var(--ir-cold) 72%,var(--primary-text-color))}
+      .loops{padding:5px 2px;gap:5px}.loop{flex-basis:76px;font-size:.78rem}.meter{width:16px;height:34px;margin:3px auto}.supply,.return{height:5px}.pipe{height:9px}.loop small{font-size:.68rem}
+      .setup{max-width:900px;margin:4px auto}.setup-nav{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:5px 0}.setup-nav button{display:flex;align-items:center;justify-content:center;gap:4px;min-height:44px;padding:5px 3px;position:relative}.setup-nav .line-icon{width:16px;height:16px}.setup-nav button small{display:none}.setup-nav button[data-complete=true]::after{content:"✓";color:var(--ir-good);font-size:.8rem}.setup-nav button[aria-current=step]{border:1px solid var(--ir-violet);background:color-mix(in srgb,var(--ir-violet) 17%,var(--card-background-color))}.setup-item{padding:6px 8px;margin:4px 0;border-radius:9px;background:color-mix(in srgb,var(--ir-violet) 4%,transparent)}.setup-item>summary{min-height:32px;box-sizing:border-box;font-weight:600;cursor:pointer}.sensor-item[data-linked=true]{border-inline-start:3px solid var(--ir-good)}.sensor-item[data-linked=false]{border-inline-start:3px solid var(--ir-warm)}
+      .setup .setup-form{gap:5px;margin:5px 0}.setup .inline-form{grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:5px}.setup .inline-form button{max-width:124px}.setup .remove-confirm{margin:3px 0}.setup .remove-confirm summary{font-size:.78rem}.setup [role=status]:empty{display:none}
+      @media(min-width:720px){.setup-nav{grid-template-columns:repeat(6,minmax(0,1fr))}.dashboard-controls{grid-template-columns:auto minmax(0,1fr);align-items:center}.dashboard-toggles{justify-self:end;width:min(100%,440px)}.room-grid{grid-template-columns:repeat(auto-fit,minmax(275px,1fr))}}
+      @media(max-width:340px){.brand h1{font-size:.92rem}.brand .line-icon{display:none}.dashboard-toggles .mode button{font-size:.71rem}.comfort-metric strong{font-size:1.18rem}.room-tile .room{grid-template-columns:minmax(0,1fr) auto}.room-tile .room>.line-icon{display:none}}
     `;
     root.append(style);
     const main = this.node("main");
     const header = this.node("header");
-    header.append(this.node("h1","irPaT & Eficiență"));
+    const brand=this.node("div",undefined,"brand");brand.append(this.icon("home"),this.node("h1","irPaT & Eficiență"),this.node("small","dev3","version-label"));header.append(brand);
     const refresh = this.node("button",this.t("Actualizează","Refresh"));
     refresh.disabled = this.busy || this.journalSaving;
     refresh.addEventListener("click",()=>this.refresh());
@@ -1327,14 +1358,14 @@ class IrpatEfficiencyPanel extends HTMLElement {
     main.append(header);
     if(this.setup){refresh.disabled=true;this.renderSetup(main);root.append(main);return;}
     if(this.setupError)main.append(this.node("p",this.setupError,"status-warm"));
-    main.append(this.node("p",this.t("Prezentare generală · versiune experimentală","Overview · experimental version"),"muted"));
+    const controls=this.node("div",undefined,"dashboard-controls");main.append(controls);
     if(!this.entries.length){
       const link=this.node("a",this.t("Adaugă integrarea","Add integration"),"action");link.href="/config/integrations";main.append(link);
     }
     for(const entry of this.entries){
       const setup=this.node("button","⚙ "+this.t("Configurează casa","Set up home")+" · "+entry.name);
       setup.disabled=this.busy||this.setupBusy||this.journalSaving;
-      setup.addEventListener("click",()=>this.openSetup(entry));main.append(setup);
+      setup.classList.add("setup-launch");setup.addEventListener("click",()=>this.openSetup(entry));controls.append(setup);
     }
     const modes = this.node("div",undefined,"mode");
     for (const [key,ro,en] of [["heating","Încălzire","Heating"],["cooling","Răcire","Cooling"]]) {
@@ -1344,7 +1375,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       button.addEventListener("click",()=>{if(this.busy||this.journalSaving)return;this.displayMode=key;this.render();});
       modes.append(button);
     }
-    main.append(modes,this.node("p",this.t("Modul selectat schimbă doar ținta afișată, nu regimul instalației.","Selected mode changes only the displayed target, not the equipment mode."),"muted"));
+    modes.classList.add("thermal-mode");modes.setAttribute("aria-label",this.t("Regim afișat, fără comandă instalație","Display mode, no equipment control"));
     const view=this.node("div",undefined,"mode");
     view.setAttribute("role","group");view.setAttribute("aria-label",this.t("Nivelul interfeței","Interface level"));
     for(const [key,ro,en] of [["simple","Simplu","Simple"],["expert","Expert","Expert"]]){
@@ -1354,14 +1385,13 @@ class IrpatEfficiencyPanel extends HTMLElement {
       button.addEventListener("click",()=>{if(this.busy||this.journalSaving)return;this.viewMode=key;this.render();});
       view.append(button);
     }
-    main.append(view);
-    if(this.viewMode==="simple")main.append(this.node("p",this.t("Modul Expert include profiluri, analize climatice, inerție, rapoarte și exporturi.","Expert mode includes profiles, climate analysis, inertia, reports and exports."),"muted"));
+    const toggles=this.node("div",undefined,"dashboard-toggles");toggles.append(modes,view);controls.append(toggles);
     if (this.busy) main.append(this.node("p",this.t("Se încarcă…","Loading…")));
     if (this.error) main.append(this.node("p",this.t("Nu s-a putut încărca configurația. Încearcă din nou.","Could not load configuration. Try again.")));
     if (!this.busy && !this.error && !this.entries.length) main.append(this.node("p",this.t("Nu există o configurație activă.","No active configuration.")));
     for (const entry of this.entries) {
       const t = entry.topology;
-      main.append(this.node("h2",entry.name));
+      main.append(this.node("h2",entry.name,"installation-title"));
       if(entry.history_save_failed) main.append(this.node("p",this.t("Istoricul nu a putut fi salvat pe disc.","History could not be saved to disk."),"status-warm"));
       const period=this.node("select");
       period.setAttribute("aria-label",this.t("Interval istoric","History interval"));
@@ -1369,7 +1399,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       period.value=this.historyHours;
       period.disabled=this.busy||this.journalSaving;
       period.addEventListener("change",()=>{if(this.busy||this.journalSaving){period.value=this.historyHours;return;}this.historyHours=period.value;this.render();});
-      const periodLabel=this.node("label",this.t("Interval statistic: ","Statistics interval: "));periodLabel.append(period);main.append(periodLabel);
+      const periodLabel=this.node("label",this.t("Interval statistic: ","Statistics interval: "));periodLabel.append(period);if(this.viewMode==="expert")main.append(periodLabel);
       const grid = this.node("div",undefined,"grid topology-grid");
       for (const [key,ro,en] of [["floors","Niveluri","Floors"],["rooms","Încăperi","Rooms"],["manifolds","Distribuitoare","Manifolds"],["circuits","Circuite","Circuits"],["zones","Zone","Zones"],["sources","Surse","Sources"]])
         grid.append(this.card(this.t(ro,en),(t[key]||[]).length));
@@ -1378,7 +1408,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       const rooms = new Map((t.rooms||[]).map(r=>[r.id,r]));
       for (const floor of t.floors||[]) {
         const section = this.node("section",undefined,"card");
-        section.append(this.node("h2",floor.name));
+        const floorTitle=this.node("div",undefined,"hero-heading");floorTitle.append(this.icon("rooms"),this.node("h2",floor.name));section.append(floorTitle);const roomGrid=this.node("div",undefined,"room-grid");section.append(roomGrid);
         for (const room of (t.rooms||[]).filter(r=>r.floor_id===floor.id)) {
           const roomCard=this.node("article",undefined,"room-tile");
           const row = this.node("div",undefined,"room");
@@ -1396,19 +1426,16 @@ class IrpatEfficiencyPanel extends HTMLElement {
               reading.age_seconds==null?"":this.t(" · raportat acum "," · reported ")+Math.floor(reading.age_seconds/60)+this.t(" min"," min ago");
             details.append(this.node("div",label+age,"muted"));
           }
-          left.append(details);
           const right = this.node("div",undefined,"temperature");
           const partial = value?.valid_count>0 && value.valid_count<value.configured_count;
           const status = partial?"unknown":value?.status||"unknown";
           const labels = {within:this.t("În toleranță","Within tolerance"),warm:this.t("Peste țintă","Above target"),cold:this.t("Sub țintă","Below target"),unknown:this.t("Date insuficiente","Insufficient data")};
           const delta = value?.deviation_c;
-          right.append(this.node("strong",value?.temperature_c==null?"—":value.temperature_c.toFixed(1)+" °C","status-"+status),
-            this.node("small",target==null?this.t("Țintă nesetată","No target"):this.t("Țintă ","Target ")+target.toFixed(1)+" °C"),
-            this.node("small",partial?this.t("Citiri parțiale","Partial readings"):labels[status]+(delta==null?"":" · "+(delta>0?"+":"")+delta.toFixed(1)+" °C"),"status-"+status));
-          row.append(left,right);
-          roomCard.append(row);
-          const detail=this.node("details",undefined,"room-detail");
-          detail.append(this.node("summary",this.t("Țintă și istoric","Target and history")));
+          roomCard.dataset.status=status;
+          left.append(this.node("small",(target==null?this.t("Țintă nesetată","No target"):this.t("Țintă ","Target ")+target.toFixed(1)+"°")+" · "+(value?.valid_count??0)+"/"+(value?.configured_count??0)+" "+this.t("senzori","sensors"),"muted"));
+          right.append(this.node("strong",value?.temperature_c==null?"—":value.temperature_c.toFixed(1)+" °C","status-"+status),this.node("small",partial?this.t("Citiri parțiale","Partial readings"):labels[status]+(delta==null?"":" · "+(delta>0?"+":"")+delta.toFixed(1)+"°"),"status-"+status));
+          row.append(this.icon("rooms"),left,right);
+          const detail=this.node("details",undefined,"room-detail");const summary=this.node("summary");summary.append(row);detail.append(summary,details);summary.setAttribute("aria-label",room.name+" · "+this.t("Țintă și istoric","Target and history"));
           const tf=this.setupForm(detail,this.t("Aplică ținta","Apply target"),()=>this.quickTargets(entry,[room.id],Number(targetInput.value)));
           tf.form.classList.add("balance-form");
           const targetInput=this.setupField(tf.form,this.t("Temperatură dorită (°C)","Desired temperature (°C)"),"number",target??22);targetInput.min=5;targetInput.max=40;targetInput.step=.1;targetInput.required=true;tf.finish();
@@ -1428,7 +1455,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
             for(const [caption,val] of cells){const cell=this.node("div");cell.append(this.node("small",caption,"muted"),this.node("strong",val));historyBox.append(cell);}
             detail.append(historyBox);
           }
-          roomCard.append(detail);section.append(roomCard);
+          roomCard.append(detail);roomGrid.append(roomCard);
         }
         for (const manifold of (t.manifolds||[]).filter(m=>m.floor_id===floor.id)) {
           section.append(this.node("h3",manifold.name));
