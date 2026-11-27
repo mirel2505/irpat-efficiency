@@ -1,6 +1,5 @@
 """Local history collection independent of the browser panel."""
 from datetime import timedelta
-from copy import deepcopy
 import asyncio
 import logging
 import hashlib
@@ -11,7 +10,8 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
-from .history import compare_room, record_samples
+from .history import compare_room
+from .history_persistence import current_series, save_sample
 from .temperature_reader import read_rooms, read_binding
 from .topology import empty_topology, temperature_conflicts
 from .temperature import summarize_room
@@ -96,9 +96,6 @@ class RoomHistory:
                 return
             topology = self.entry.options.get("topology", empty_topology())
             fingerprint = self.fingerprint(topology)
-            if fingerprint != self.configuration_hash:
-                self.configuration_hash = fingerprint
-                self.configuration_since = dt_util.utcnow().timestamp()
             rooms = read_rooms(self.hass, topology)
             values = {}
             for identifier, room in rooms.items():
@@ -117,11 +114,13 @@ class RoomHistory:
                         and reading["age_seconds"] <= MAX_REPORT_AGE_SECONDS
                         and reading["temperature_c"] is not None):
                     values[OUTDOOR_KEY] = reading["temperature_c"]
-            record_samples(self.data, dt_util.utcnow().timestamp(), values)
             try:
-                await self.store.async_save({"rooms": deepcopy(self.data),
-                                             "configuration_hash": self.configuration_hash,
-                                             "configuration_since": self.configuration_since})
+                saved = await save_sample(self.store, self.data, self.configuration_hash,
+                                          self.configuration_since, fingerprint,
+                                          dt_util.utcnow().timestamp(), values)
+                self.data = saved["rooms"]
+                self.configuration_hash = saved["configuration_hash"]
+                self.configuration_since = saved["configuration_since"]
                 self.save_failed = False
             except Exception:
                 self.save_failed = True
@@ -132,7 +131,9 @@ class RoomHistory:
         tz = dt_util.get_time_zone(self.hass.config.time_zone)
         if tz is None:
             return {}
-        return {room["id"]: compare_room(self.data.get(room["id"], {}), now, tz)
+        series = current_series(self.data, self.configuration_hash,
+                                self.configuration_since, self.fingerprint(topology))
+        return {room["id"]: compare_room(series.get(room["id"], {}), now, tz)
                 for room in topology["rooms"]}
 
     async def async_stop(self):
