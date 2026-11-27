@@ -308,6 +308,11 @@ class IrpatEfficiencyPanel extends HTMLElement {
       const s=live.sources?.[source.id];
       if(!s)continue;
       box.append(this.node("h3",source.name));
+      const reported=entry.reported_modes?.[source.id];
+      if(reported){
+        const modes={heating:this.t("Încălzire","Heating"),cooling:this.t("Răcire","Cooling"),dhw:this.t("ACM","Domestic hot water"),standby:this.t("Așteptare","Standby"),defrost:this.t("Degivrare","Defrost"),off:this.t("Oprit","Off")};
+        box.append(this.node("p",this.t("Regim raportat: ","Reported mode: ")+(modes[reported.mode]||this.t("Necunoscut","Unknown")),"muted"));
+      }
       const grid=this.node("div",undefined,"grid");
       grid.append(this.card("ΔT",fmt(s.delta_t_c,"°C")),
         this.card(this.t("Putere termică măsurată","Measured thermal power"),fmt(s.thermal_measured_w,"W")),
