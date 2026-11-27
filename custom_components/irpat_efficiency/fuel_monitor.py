@@ -1,5 +1,4 @@
 """Separate fuel ledger using the proven cumulative-meter interval engine."""
-from collections import Counter
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
@@ -45,7 +44,10 @@ class FuelMonitor:
 
     def overview(self, topology, now, tz):
         samples = self.samples(topology, now)
-        result = self.history.overview(samples, now, tz)
+        try:
+            result = self.history.overview(samples, now, tz)
+        except ValueError:
+            return {}
         for source in topology["sources"]:
             f = source.get("fuel", {})
             for row in result.get(source["id"], {}).values():
