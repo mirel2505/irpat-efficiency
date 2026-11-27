@@ -283,14 +283,27 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
         errors = {}
         if user_input is not None:
             try:
-                self._topology, self._sensor_room = import_room(
+                updated, room_id = import_room(
                     self._topology, floors, areas, user_input["ha_area_id"], user_input.get("fallback_floor"))
+                room = next(r for r in updated["rooms"] if r["id"] == room_id)
+                changes = {k: user_input[k] for k in ("area_m2", "heating_target_c", "cooling_target_c")
+                           if user_input.get(k) is not None}
+                self._topology = edit_item(updated, "rooms", room_id, room["name"], **changes)
+                self._sensor_room = room_id
                 return await self.async_step_confirm_sensors()
             except TopologyError as exc:
                 errors["base"] = str(exc)
         choices = {k: v["name"] + " (" + floors[v["floor_id"]] + ")" if v.get("floor_id") in floors else v["name"]
                    for k,v in areas.items()}
-        fields = {vol.Required("ha_area_id"): self._native_selector(choices)}
+        fields = {
+            vol.Required("ha_area_id"): self._native_selector(choices),
+            vol.Optional("area_m2"): selector.NumberSelector(selector.NumberSelectorConfig(
+                min=0.1, max=10000, step=0.01, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="m²")),
+            vol.Optional("heating_target_c"): selector.NumberSelector(selector.NumberSelectorConfig(
+                min=5, max=40, step=0.1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="°C")),
+            vol.Optional("cooling_target_c"): selector.NumberSelector(selector.NumberSelectorConfig(
+                min=5, max=40, step=0.1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="°C")),
+        }
         if self._topology["floors"]:
             fields[vol.Optional("fallback_floor")] = self._reference("floors")
         return self.async_show_form(step_id="room_existing", data_schema=vol.Schema(fields), errors=errors)
@@ -299,7 +312,7 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
         return await self._add("room_custom", "rooms", {
             vol.Required("floor_id"): self._reference("floors"),
             vol.Optional("area_m2"): selector.NumberSelector(selector.NumberSelectorConfig(
-                min=0.1, max=10000, step=0.1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="m²")),
+                min=0.1, max=10000, step=0.01, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="m²")),
             vol.Optional("heating_target_c"): selector.NumberSelector(selector.NumberSelectorConfig(
                 min=5, max=40, step=0.1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="°C")),
             vol.Optional("cooling_target_c"): selector.NumberSelector(selector.NumberSelectorConfig(
