@@ -265,6 +265,30 @@ class IrpatEfficiencyPanel extends HTMLElement {
     return box;
   }
 
+  weatherObservations(entry) {
+    const box=this.node("section",undefined,"card");
+    box.append(this.node("h2",this.t("Observații climatice","Weather observations")));
+    if(!entry.topology.outdoor_entity_id){
+      box.append(this.node("p",this.t("Selectează un senzor exterior în configurare.","Select an outdoor sensor in configuration.")));
+      return box;
+    }
+    const observations=entry.weather_observations||{};
+    for(const z of entry.topology.zones||[]){
+      box.append(this.node("h3",z.name));
+      const rows=observations[z.id]||[];
+      if(!rows.length)box.append(this.node("p",this.t("Se colectează date sau zona nu poate fi analizată separat.","Collecting data or zone cannot be analyzed separately."),"muted"));
+      for(const d of rows){
+        const line=this.node("div",undefined,"room");
+        const temp=v=>v==null?"—":v.toFixed(2)+" °C";
+        line.append(this.node("span",new Date(d.start*1000).toLocaleString()+" — "+new Date(d.end*1000).toLocaleString()),
+          this.node("span",this.t("Exterior ","Outdoor ")+temp(d.outdoor_c)+" · "+this.t("Abatere ","Error ")+temp(d.common_error_c)+" · "+Math.round(d.coverage*100)+"%"));
+        box.append(line);
+      }
+    }
+    box.append(this.node("small",this.t("Intervale sincronizate de 24 h pentru încălzire. Observațiile nu sunt încă validate ca fiind comparabile; nu se recomandă modificarea curbei.","Aligned 24 h heating windows. Observations are not yet reviewed for comparability; no curve adjustment is recommended."),"muted"));
+    return box;
+  }
+
   render() {
     const root = this.shadowRoot;
     root.replaceChildren();
@@ -329,7 +353,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       const grid = this.node("div",undefined,"grid");
       for (const [key,ro,en] of [["floors","Niveluri","Floors"],["rooms","Încăperi","Rooms"],["manifolds","Distribuitoare","Manifolds"],["circuits","Circuite","Circuits"],["zones","Zone","Zones"],["sources","Surse","Sources"]])
         grid.append(this.card(this.t(ro,en),(t[key]||[]).length));
-      main.append(grid,this.thermalDiagnostics(entry),this.referenceProfiles(entry));
+      main.append(grid,this.thermalDiagnostics(entry),this.referenceProfiles(entry),this.weatherObservations(entry));
       const rooms = new Map((t.rooms||[]).map(r=>[r.id,r]));
       for (const floor of t.floors||[]) {
         const section = this.node("section",undefined,"card");
