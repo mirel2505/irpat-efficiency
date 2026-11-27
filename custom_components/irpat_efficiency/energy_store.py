@@ -4,6 +4,7 @@ from copy import deepcopy
 from datetime import datetime
 
 from .energy_history import SLOT, append_interval, finite, meter_delta, period_dates, summarize
+from .paired_energy import matched_heat
 
 
 class EnergyStore:
@@ -49,8 +50,11 @@ class EnergyStore:
                 old = self.baselines.get(sid)
                 if old and old['signature'] == signature and old['slot'] == slot-SLOT and t > old['timestamp']:
                     delta = meter_delta(old['value'], v)
-                    append_interval(ledger, slot-SLOT, slot, delta, None, timezone=timezone)
-                baselines[sid] = {'signature': signature, 'slot': slot, 'value': v, 'timestamp': t}
+                    mode, heat = matched_heat(old, sample)
+                    append_interval(ledger, slot-SLOT, slot, delta, heat, timezone=timezone,
+                                    mode=mode, boundary_confirmed=mode is not None)
+                baselines[sid] = {'signature': signature, 'slot': slot, 'value': v, 'timestamp': t,
+                                  'pair': deepcopy(sample.get('pair'))}
             # On failure do not advance baselines or publish unpersisted totals.
             if prospective != self.data:
                 await self.store.async_save({'sources': deepcopy(prospective)})
