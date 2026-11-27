@@ -40,9 +40,9 @@ class EnergyStore:
             counts = Counter(s['entity_id'] for s in samples.values())
             for sid, sample in samples.items():
                 entity = sample['entity_id']
-                if counts[entity] > 1:
+                if counts[entity] > 1 or sample.get('blocked'):
                     continue
-                signature = [entity, str(timezone)]
+                signature = [entity, str(timezone), *sample.get('signature_extra', [])]
                 segments = prospective.setdefault(sid, [])
                 if not segments or segments[-1]['signature'] != signature:
                     segments.append({'signature': signature, 'ledger': {}})
@@ -80,8 +80,8 @@ class EnergyStore:
         counts = Counter(s['entity_id'] for s in samples.values())
         for sid, sample in samples.items():
             segments = self.data.get(sid, [])
-            signature = [sample['entity_id'], str(timezone)]
-            shared = counts[sample['entity_id']] > 1
+            signature = [sample['entity_id'], str(timezone), *sample.get('signature_extra', [])]
+            shared = counts[sample['entity_id']] > 1 or sample.get('blocked', False)
             segment = segments[-1] if not shared and segments and segments[-1]['signature'] == signature else {}
             ledger = segment.get('ledger', {})
             pairs = segment.get('pair_segments', [])
