@@ -9,6 +9,7 @@ from homeassistant.helpers import selector
 
 from .const import OPERATING_MODES, CIRCUIT_CONTROLS
 from .topology import SOURCE_TYPES, TopologyError, add_item, empty_topology
+from .topology_edit import EDIT_FIELDS, OPTIONAL_FIELDS, edit_item
 from .telemetry import ROLE_GROUPS, set_binding
 from .source_settings import FLUID_TYPES, set_source_settings
 from .operation_mode import MODES, configure_mode
@@ -28,6 +29,7 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
         """Open the configuration menu."""
         if not hasattr(self, "_topology"):
             self._topology = deepcopy(self.config_entry.options.get("topology", empty_topology()))
+        self._editing = None
         t = self._topology
         menu = ["floor", "zone", "outdoor"]
         if t["floors"]:
@@ -46,6 +48,8 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
         for group in ROLE_GROUPS:
             if t[group]:
                 menu.append(f"telemetry_{group}")
+        if any(t[group] for group in EDIT_FIELDS):
+            menu.append("edit")
         menu.append("save")
         return self.async_show_menu(step_id="init", menu_options=menu)
 
@@ -56,8 +60,52 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
             multiple=multiple, mode=selector.SelectSelectorMode.DROPDOWN,
         ))
 
+    async def async_step_edit(self, user_input=None):
+        """Choose which kind of existing item to edit."""
+        collections = [key for key in EDIT_FIELDS if self._topology[key]]
+        if user_input is not None and user_input.get("collection") in collections:
+            self._edit_collection = user_input["collection"]
+            return await self.async_step_edit_select()
+        return self.async_show_form(step_id="edit", data_schema=vol.Schema({
+            vol.Required("collection"): _choices(collections, "edit_collection"),
+        }), errors={"base": "invalid_reference"} if user_input is not None else {})
+
+    async def async_step_edit_select(self, user_input=None):
+        collection = getattr(self, "_edit_collection", None)
+        if collection not in EDIT_FIELDS or not self._topology[collection]:
+            return await self.async_step_edit()
+        if user_input is not None:
+            identifier = user_input.get("item_id")
+            if any(item["id"] == identifier for item in self._topology[collection]):
+                self._editing = (collection, identifier)
+                return await self.async_step_edit_item()
+        return self.async_show_form(step_id="edit_select", data_schema=vol.Schema({
+            vol.Required("item_id"): self._reference(collection),
+        }), errors={"base": "invalid_reference"} if user_input is not None else {})
+
+    async def async_step_edit_item(self, user_input=None):
+        editing = getattr(self, "_editing", None)
+        if not editing:
+            return await self.async_step_init()
+        steps = {"floors": self.async_step_floor, "zones": self.async_step_zone,
+                 "sources": self.async_step_source, "rooms": self.async_step_room,
+                 "manifolds": self.async_step_manifold, "circuits": self.async_step_circuit,
+                 "bindings": self.async_step_binding}
+        return await steps[editing[0]](user_input)
+
     async def _add(self, step, collection, fields, user_input):
         errors = {}
+        editing = getattr(self, "_editing", None)
+        original = None
+        if editing:
+            if editing[0] != collection:
+                return await self.async_step_init()
+            original = next((i for i in self._topology[collection] if i["id"] == editing[1]), None)
+            if original is None:
+                return await self.async_step_init()
+            fields = {marker: value for marker, value in fields.items()
+                      if marker.schema in EDIT_FIELDS[collection]}
+            step = "edit_item"
         if user_input is not None:
             try:
                 values = dict(user_input)
@@ -67,11 +115,23 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
                     if isinstance(position, bool) or int(position) != position:
                         raise TopologyError("invalid_position")
                     values["position"] = int(position)
-                self._topology, _ = add_item(self._topology, collection, name, **values)
+                if original is not None:
+                    for key in EDIT_FIELDS[collection]:
+                        if key in OPTIONAL_FIELDS and key not in values:
+                            values[key] = None
+                    self._topology = edit_item(self._topology, collection, original["id"], name, **values)
+                else:
+                    self._topology, _ = add_item(self._topology, collection, name, **values)
                 return await self.async_step_init()
             except TopologyError as exc:
                 errors["base"] = str(exc)
         schema = vol.Schema({vol.Required("name"): selector.TextSelector(), **fields})
+        if original is not None:
+            suggested = {key: original[key] for key in ("name", *EDIT_FIELDS[collection])
+                         if original.get(key) is not None}
+            if user_input is not None:
+                suggested.update(user_input)
+            schema = self.add_suggested_values_to_schema(schema, suggested)
         return self.async_show_form(step_id=step, data_schema=schema, errors=errors)
 
     async def async_step_floor(self, user_input=None):
