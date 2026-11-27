@@ -88,3 +88,8 @@ class EnergyHistoryTests(unittest.TestCase):
         self.add(300, 1)
         with self.assertRaises(ValueError):
             self.summary(elapsed=0)
+
+    def test_future_row_even_with_sparse_data(self):
+        self.add(600, 1)
+        with self.assertRaises(ValueError):
+            self.summary(elapsed=300)
