@@ -27,7 +27,7 @@ def create_profile(name, topology, zone_id, snapshots, mode, *, now=None):
         if not circuits or set(readings) != circuits or not all(finite(v) and v >= 0 for v in readings.values()):
             raise ValueError("incomplete_circuits")
         flows.update(readings)
-        references[mid] = {"snapshot_id": s["id"], "timestamp": s["timestamp"]}
+        references[mid] = {"snapshot_id": s["id"], "timestamp": s["timestamp"], "circuit_ids": sorted(circuits)}
     room_ids = {c.get("room_id") for c in topology["circuits"] if c["manifold_id"] in manifolds}
     targets = {r["id"]: r.get(f"{mode}_target_c") for r in topology["rooms"] if r["id"] in room_ids}
     stamp = now or datetime.now(timezone.utc)
