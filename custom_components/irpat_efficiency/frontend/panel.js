@@ -357,6 +357,32 @@ class IrpatEfficiencyPanel extends HTMLElement {
     return box;
   }
 
+  energyHistory(entry) {
+    const history=entry.energy_history||{};
+    const box=this.node("section",undefined,"card");
+    if(!Object.keys(history).length)return this.node("div");
+    box.append(this.node("h2",this.t("Istoric consum electric","Electricity consumption history")));
+    if(entry.energy_save_failed)box.append(this.node("p",this.t("Salvarea istoricului energetic a eșuat.","Energy history save failed."),"status-warm"));
+    const names={daily:this.t("Astăzi","Today"),weekly:this.t("Săptămâna curentă","This week"),monthly:this.t("Luna curentă","This month"),annual:this.t("Anul curent","This year")};
+    for(const source of entry.topology.sources||[]){
+      const periods=history[source.id];
+      if(!periods)continue;
+      box.append(this.node("h3",source.name));
+      const grid=this.node("div",undefined,"grid");
+      for(const key of Object.keys(names)){
+        const row=periods[key];
+        if(!row)continue;
+        const value=row.electric_kwh==null?"—":row.electric_kwh.toFixed(2)+" kWh";
+        const card=this.card(names[key],value);
+        card.append(this.node("small",this.t("Acoperire: ","Coverage: ")+(row.coverage==null?"—":(100*row.coverage).toFixed(1)+"%"),"muted"));
+        grid.append(card);
+      }
+      box.append(grid);
+    }
+    box.append(this.node("p",this.t("Doar consumul observat din contorul configurat. Golurile nu sunt estimate. Totalurile folosesc calendarul local și alocarea aproximativă la intervale de 5 minute; după schimbarea contorului se afișează segmentul curent. COP pe perioadă necesită confirmarea regimului și a limitelor de măsurare.","Only observed consumption from the configured meter. Gaps are not estimated. Totals use local calendar dates and approximate five-minute allocation; after meter replacement the current segment is shown. Period COP requires confirmed mode and measurement boundaries."),"muted"));
+    return box;
+  }
+
   render() {
     const root = this.shadowRoot;
     root.replaceChildren();
@@ -421,7 +447,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       const grid = this.node("div",undefined,"grid");
       for (const [key,ro,en] of [["floors","Niveluri","Floors"],["rooms","Încăperi","Rooms"],["manifolds","Distribuitoare","Manifolds"],["circuits","Circuite","Circuits"],["zones","Zone","Zones"],["sources","Surse","Sources"]])
         grid.append(this.card(this.t(ro,en),(t[key]||[]).length));
-      main.append(grid,this.liveDiagnostics(entry),this.defrostHistory(entry),this.thermalDiagnostics(entry),this.referenceProfiles(entry),this.weatherObservations(entry));
+      main.append(grid,this.liveDiagnostics(entry),this.energyHistory(entry),this.defrostHistory(entry),this.thermalDiagnostics(entry),this.referenceProfiles(entry),this.weatherObservations(entry));
       const rooms = new Map((t.rooms||[]).map(r=>[r.id,r]));
       for (const floor of t.floors||[]) {
         const section = this.node("section",undefined,"card");
