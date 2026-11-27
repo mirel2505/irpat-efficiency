@@ -39,6 +39,12 @@ The pure Python inertia module measures observed indoor temperature drift over r
 
 Eight inertia unit tests were executed locally on 2026-11-27 and passed. Git blob hashes matched the tested files: inertia.py `58f3390918b219f40c9cfcaaddd0865fde012e18` and test_inertia.py `d7d6e09dfe19dc5cfda355517664310e22e659f6`. This is not a full regression run or a Home Assistant runtime test.
 
+## Energy efficiency diagnostics — experimental
+
+The pure Python efficiency module integrates matched five-minute electrical and signed thermal power samples with the trapezoidal rule. Missing or invalid endpoints exclude the affected interval from both energies; partial results explicitly include coverage. COP is the ratio of matched net useful thermal energy to electrical energy, with cooling sign convention and defrost losses included in the net balance. This requires confirmed common measurement boundaries and mode. Constant-tariff costs and thermal energy per floor area are optional. A decreasing cumulative meter is rejected across resets, rather than reconstructed. Apparent heat loss per degree-hour is calculated only for reviewed, completely covered periods; fuel efficiency requires explicitly stated LHV or HHV input. Actual source bindings, meter history, high-frequency defrost accounting, dashboard integration and real Home Assistant validation remain pending.
+
+On 2026-11-27, all 11 efficiency unit tests passed in local Python. The tested Git blob hashes match the committed files: efficiency.py `9e3561f0de5d55c6b01294595f334e7d3c52d23e` and test_efficiency.py `ba71cf44932853b5a9f0796dc87301c63abda679`. This was a targeted module test, not a full regression run.
+
 ## Principii / Principles
 
 - Local, read-only towards physical equipment; manual adjustments by the user.
