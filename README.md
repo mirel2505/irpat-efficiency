@@ -27,6 +27,12 @@ Manual reference profile construction requires a complete set of circuit reading
 
 On 2026-11-27, 14 local unit tests passed in Python: nine stability and five profile construction tests. Tested Git blob hashes match the committed files: stability.py `83d762f8491f82f4b2a0c3e63693a73be54ff1b8`, test_stability.py `ce236e5c84aaf1f7cb7e27b0d03538d7c7e46b6d`, profiles.py `80d5a40e23949a077383e0286084a3d11f24e507`, test_profiles.py `3ec8e52c9596f13902a8cefa5e5a9f339bfb8518`. These results do not constitute a complete regression run or an HA integration test.
 
+## Climate curve diagnostics — experimental
+
+The pure Python heating-curve module evaluates reviewed comparable daily observations with aligned outdoor temperature and common room error, rejecting incomplete coverage and excessive local residuals. Provisional requirements: at least three distinct reviewed days for offset or fixed-supply hypotheses; at least five and a 5°C outdoor span for slope hypotheses; fixed supply observations require a maximum 2°C outdoor span. These are heuristics, not validated causal or automatic adjustment rules. Cooling slope diagnostics are not implemented. The comfort-direction helper preserves the distinction between desired room temperature and supply temperature, and blocks colder cooling targets pending condensation review.
+
+On 2026-11-27, nine climate-curve unit tests were executed locally and passed. The exact tested Git blobs are climate_curve.py `5c05fe88529c9f32dec5a0a3226ab1950fee53c6` and test_climate_curve.py `661d66972f19e140cb2049fcf0ef759d79c8e856`. Actual outdoor sensor configuration, synchronized collection, comparable-day review UI, journal integration, comfort target editing and HA runtime testing remain pending. No equipment commands are issued.
+
 ## Principii / Principles
 
 - Local, read-only towards physical equipment; manual adjustments by the user.
