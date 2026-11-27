@@ -22,6 +22,7 @@ async def test_source_settings_and_draft_survive_cancel(hass, enable_custom_inte
     await hass.async_block_till_done()
     manager = hass.config_entries.options
     result = await manager.async_init(entry.entry_id)
+    result = await manager.async_configure(result["flow_id"], {"next_step_id": "all_actions"})
     fid = result["flow_id"]
     # Use custom floor form with an empty HA floor registry.
     result = await manager.async_configure(fid, {"next_step_id": "floor"})
@@ -42,6 +43,7 @@ async def test_source_settings_and_draft_survive_cancel(hass, enable_custom_inte
     manager.async_abort(fid)
     assert entry.options["topology"] == topology
     result = await manager.async_init(entry.entry_id)
+    result = await manager.async_configure(result["flow_id"], {"next_step_id": "all_actions"})
     fid = result["flow_id"]
     assert "discard_draft" in result["menu_options"]
     assert "room" in result["menu_options"]
@@ -54,6 +56,7 @@ async def test_source_settings_and_draft_survive_cancel(hass, enable_custom_inte
     assert saved["sources"][0]["fluid_type"] == "propylene_glycol"
     assert saved["sources"][0]["id"] == source
     result = await manager.async_init(entry.entry_id)
+    result = await manager.async_configure(result["flow_id"], {"next_step_id": "all_actions"})
     assert "discard_draft" not in result["menu_options"]
     manager.async_abort(result["flow_id"])
 
@@ -66,6 +69,7 @@ async def test_discard_draft_retains_saved_configuration(hass, enable_custom_int
     await hass.async_block_till_done()
     manager = hass.config_entries.options
     result = await manager.async_init(entry.entry_id)
+    result = await manager.async_configure(result["flow_id"], {"next_step_id": "all_actions"})
     fid = result["flow_id"]
     result = await manager.async_configure(fid, {"next_step_id": "floor"})
     result = await manager.async_configure(fid, {"name": "Draft floor"})
@@ -76,6 +80,7 @@ async def test_discard_draft_retains_saved_configuration(hass, enable_custom_int
     assert "discard_draft" not in result["menu_options"]
     manager.async_abort(fid)
     result = await manager.async_init(entry.entry_id)
+    result = await manager.async_configure(result["flow_id"], {"next_step_id": "all_actions"})
     assert "discard_draft" not in result["menu_options"]
     result = await manager.async_configure(result["flow_id"], {"next_step_id": "save"})
     assert result["type"] is FlowResultType.CREATE_ENTRY
