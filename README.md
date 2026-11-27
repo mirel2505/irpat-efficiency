@@ -9,7 +9,7 @@ Local, advisory-only Home Assistant integration for hydronic radiant floor heati
 ## Stadiu / Status
 
 **0.1.0.dev0 — experimental foundation, not ready for installation on a production system.**
-Initial configuration entry and calculation primitives are implemented. The dedicated panel, sensor selection, historical data, balancing assistant and reports are not yet implemented. HACS metadata is present; installation has not been validated. No release is available.
+Initial configuration entry and calculation primitives are implemented. The dedicated panel, sensor selection, historical data, balancing assistant and reports are not yet implemented. Marketplace metadata (hacs.json) is present; installation has not been validated. No release is available.
 
 ## Principii / Principles
 
@@ -18,6 +18,20 @@ Initial configuration entry and calculation primitives are implemented. The dedi
 - Multiple floors, manifolds and independent hydraulic zones are planned.
 - Full balancing method: continuous weather compensation with open circuits; fixed supply with continuous operation has limited support; ON/OFF-controlled systems remain monitoring-only.
 - No mandatory YAML, no hardcoded personal configuration, no cloud subscription.
+
+## Instalare / Installation — planned
+
+Home Assistant 2026.11+ includes Marketplace under **Settings → Marketplace**, replacing standalone HACS. The project retains the required `hacs.json` metadata for Marketplace and legacy HACS compatibility.
+
+[![Open in Home Assistant Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=mirel2505&repository=irpat-efficiency&category=integration)
+
+[![Configure irPaT & Eficiență in Home Assistant](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=irpat_efficiency)
+
+**Not ready for installation:** the repository is private during development and no validated release is available. These links are prepared for the future release. After publication, open the first link, confirm installation in your own Home Assistant, then use the second link to start setup. Restart only if Home Assistant requires it.
+
+For older Home Assistant versions using HACS, compatibility remains a validation target, not a guarantee.
+
+Official guide: https://contributors.home-assistant.io/marketplace/guides/integrations/
 
 ## Documentation
 
@@ -34,7 +48,7 @@ Run the initial pure-Python unit tests from the repository root:
 python -m unittest discover -s tests -v
 ```
 
-Home Assistant integration tests, frontend and packaging validation remain pending.
+Home Assistant integration tests, frontend and Marketplace packaging validation remain pending.
 
 ## Support / Susținere
 
