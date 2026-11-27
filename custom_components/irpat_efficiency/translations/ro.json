@@ -35,6 +35,106 @@
         "automatic": "Actuatoare comandate automat",
         "unknown": "Necunoscut"
       }
+    },
+    "source_type": {
+      "options": {
+        "heat_pump": "Pompă de căldură",
+        "gas": "Gaz / GPL",
+        "electric": "Electrică",
+        "biomass": "Lemne / peleți",
+        "district": "Termoficare",
+        "hybrid": "Hibrid",
+        "other": "Altă sursă",
+        "unintegrated": "Neintegrată"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configurația instalației",
+        "description": "Adaugă niveluri și zone, apoi încăperi, distribuitoare, circuite și senzori. Apasă Salvează pentru a păstra modificările.",
+        "menu_options": {
+          "floor": "Adaugă nivel",
+          "zone": "Adaugă zonă hidraulică",
+          "room": "Adaugă încăpere",
+          "source": "Adaugă sursă termică",
+          "manifold": "Adaugă distribuitor",
+          "circuit": "Adaugă circuit",
+          "binding": "Adaugă senzor ambiental",
+          "save": "Salvează configurația"
+        }
+      },
+      "floor": {
+        "title": "Adaugă nivel",
+        "data": {
+          "name": "Denumire proprie"
+        }
+      },
+      "zone": {
+        "title": "Adaugă zonă hidraulică",
+        "data": {
+          "name": "Denumire proprie",
+          "operating_mode": "Regim de funcționare",
+          "circuit_control": "Controlul circuitelor"
+        }
+      },
+      "room": {
+        "title": "Adaugă încăpere",
+        "data": {
+          "name": "Denumire proprie",
+          "floor_id": "Nivel",
+          "area_m2": "Suprafață",
+          "heating_target_c": "Țintă încălzire",
+          "cooling_target_c": "Țintă răcire"
+        }
+      },
+      "source": {
+        "title": "Adaugă sursă termică",
+        "data": {
+          "name": "Denumire proprie",
+          "source_type": "Tip sursă",
+          "zone_ids": "Zone deservite"
+        }
+      },
+      "manifold": {
+        "title": "Adaugă distribuitor",
+        "data": {
+          "name": "Denumire proprie",
+          "floor_id": "Nivel",
+          "zone_id": "Zonă hidraulică"
+        }
+      },
+      "circuit": {
+        "title": "Adaugă circuit",
+        "data": {
+          "name": "Denumire proprie",
+          "manifold_id": "Distribuitor",
+          "position": "Poziție de la stânga la dreapta",
+          "length_m": "Lungime circuit",
+          "room_id": "Încăpere"
+        }
+      },
+      "binding": {
+        "title": "Adaugă senzor ambiental",
+        "data": {
+          "name": "Denumire proprie",
+          "room_id": "Încăpere",
+          "entity_id": "Senzor sau termostat"
+        }
+      }
+    },
+    "error": {
+      "invalid_name": "Denumire invalidă.",
+      "invalid_reference": "Referință invalidă.",
+      "invalid_number": "Valoare numerică invalidă.",
+      "invalid_mode": "Regim invalid.",
+      "invalid_source": "Sursă invalidă.",
+      "invalid_position": "Poziție invalidă.",
+      "duplicate_position": "Poziția este deja ocupată.",
+      "invalid_entity": "Entitate incompatibilă.",
+      "duplicate_entity": "Senzor deja asociat.",
+      "invalid_schema": "Configurație incompatibilă."
     }
   }
 }
