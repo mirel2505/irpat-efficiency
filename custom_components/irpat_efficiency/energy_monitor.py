@@ -8,6 +8,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .energy_store import EnergyStore
+from .source_settings import estimate_cost
 from .telemetry_reader import read_telemetry
 from .topology import empty_topology
 
@@ -53,7 +54,11 @@ class EnergyMonitor:
             return {}
         samples = self.meter_samples(topology, telemetry)
         try:
-            return self.history.overview(samples, dt_util.utcnow().timestamp(), tz)
+            result = self.history.overview(samples, dt_util.utcnow().timestamp(), tz)
+            for source in topology["sources"]:
+                for row in result.get(source["id"], {}).values():
+                    row["current_tariff_cost"] = estimate_cost(row["electric_kwh"], source)
+            return result
         except ValueError:
             return {}
 
