@@ -22,3 +22,18 @@ jobs:
       - run: node scripts/check_ui_contracts.mjs
       - run: node scripts/test_panel_behavior.mjs
       - run: python scripts/check_package.py
+      - name: Build private installation candidate
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p dist
+          git archive --format=zip --output="dist/irpat-efficiency-${GITHUB_SHA}.zip" HEAD custom_components/irpat_efficiency hacs.json README.md LICENSE IMPLEMENTATION_STATUS.md
+          cd dist
+          sha256sum *.zip > SHA256SUMS.txt
+      - name: Upload candidate (not a release)
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: irpat-efficiency-candidate-${{ github.sha }}
+          path: dist/
+          retention-days: 14
+          if-no-files-found: error

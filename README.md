@@ -8,7 +8,7 @@ Local, advisory-only Home Assistant integration for hydronic radiant floor heati
 
 ## Stadiu / Status
 
-**0.1.0.dev0 — development build, not a validated release.** The repository is private. Do not install on a production system before the isolated Home Assistant tests and owner approval. See [implementation scope and release gates](IMPLEMENTATION_STATUS.md) for the distinction between implemented functionality and the full product specification.
+**0.1.0.dev0 — private beta candidate, not a public release.** The tested baseline passed isolated Core, Chromium and archive recovery checks. Installation on the owner's Home Assistant requires explicit approval. See [implementation scope and release gates](IMPLEMENTATION_STATUS.md) for the distinction between implemented functionality and the full product specification.
 
 ## Funcționalități / Implemented in source
 
@@ -37,7 +37,7 @@ Use **Settings → System → Backups** and include Home Assistant settings. Kee
 
 ## Instalare / Installation — not released
 
-Planned distribution targets are Home Assistant Marketplace and compatible HACS installations. Metadata and links are prepared, but installation has not been validated and the repository is private.
+Planned distribution targets are Home Assistant Marketplace and compatible HACS installations. Metadata and links are prepared; distribution through these catalogs is not yet validated and the repository is private. The private GitHub Actions candidate contains the tracked integration folder, documentation and a SHA-256 checksum. It is not a public release.
 
 [![Open in Home Assistant Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=mirel2505&repository=irpat-efficiency&category=integration)
 
@@ -57,7 +57,7 @@ node scripts/check_ui_contracts.mjs
 node scripts/test_panel_behavior.mjs
 ```
 
-The available local Python subset passed 261 tests on 2026-11-27. Seven panel behavior checks passed against the actual JavaScript class with a minimal DOM stub. These results are not full pinned-commit CI or browser/HA execution results. The HA compatibility workflow is configured, but a successful run has not been confirmed. No beta release is available.
+Verified baseline commit [1079177](https://github.com/mirel2505/irpat-efficiency/commit/107917792cdccb3e0ffcd843385ed97a21050073), 2026-11-27: 306 Python tests, 17 static contracts, 7 JavaScript class tests, 7 real Core tests on each of 2026.10.4 and 2026.11.2, 2 Chromium scenarios with synthetic HA responses, and package validation. Native encrypted and unencrypted archive recovery passed on synthetic files in isolated directories; this is not an HAOS restart/restore test. Full integrated browser session and real installation validation remain open. See the Actions runs and ROADMAP.md. No public release.
 
 - [SPECIFICATION.md](SPECIFICATION.md) — original full product requirements
 - [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) — current scope, gaps, release gates
