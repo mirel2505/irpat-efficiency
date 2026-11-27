@@ -9,6 +9,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
+from .storage_identity import storage_key
 from .event_journal import EventJournal
 from .defrost import enabled_sources, observe
 from .telemetry_reader import read_telemetry
@@ -21,7 +22,7 @@ class DefrostMonitor:
     def __init__(self, hass, entry):
         self.hass = hass
         self.entry = entry
-        self.store = Store(hass, 1, f"{DOMAIN}.defrost.{entry.entry_id}")
+        self.store = Store(hass, 1, storage_key(entry, "defrost"))
         self.journal = EventJournal(self.store, "end", 2000)
         self.states = {}
         self.signatures = {}
