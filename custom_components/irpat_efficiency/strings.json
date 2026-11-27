@@ -160,7 +160,8 @@
           "manage_menu": "5. Edit or remove",
           "all_actions": "Expert – all configuration actions",
           "overview_menu": "Back to configuration overview",
-          "room_setup": "Complete existing room (sensors and circuits)"
+          "room_setup": "Complete existing room (sensors and circuits)",
+          "beta_reset": "Reset entire configuration (Beta)"
         }
       },
       "floor": {
@@ -498,7 +499,8 @@
           "remove": "Remove one or more objects",
           "discard_draft": "Discard draft (keep saved configuration)",
           "overview_menu": "Back to configuration overview",
-          "save": "Save configuration"
+          "save": "Save configuration",
+          "beta_reset": "Reset entire configuration (Beta)"
         }
       },
       "all_actions": {
@@ -527,7 +529,8 @@
           "economic_source": "Fuel and economic scenarios",
           "hybrid_zone": "Hybrid operating strategy",
           "overview_menu": "Back to configuration overview",
-          "room_setup": "Complete existing room (sensors and circuits)"
+          "room_setup": "Complete existing room (sensors and circuits)",
+          "beta_reset": "Reset entire configuration (Beta)"
         }
       },
       "overview_menu": {
@@ -559,6 +562,15 @@
           "cancel": "Cancel and return to menu",
           "detach_zone_sources": "Detach selected zones from retained sources"
         }
+      },
+      "beta_reset": {
+        "title": "Reset entire configuration (Beta)",
+        "description": "This immediately applies a fresh irPaT test session: all floors, rooms, zones, distributors, circuits, sources, sensor links, tariffs and the active draft are cleared. All displayed history starts empty. Old storage files remain isolated on disk and are included in native backups; this is not secure erasure and there is no in-app undo. Home Assistant areas, devices, entities, automations and other integrations are unchanged. Make a backup first. Type RESET and confirm. No Core restart is intended; the integration reloads.",
+        "data": {
+          "confirmation": "Type RESET",
+          "confirmed": "I confirm the entire irPaT configuration reset",
+          "cancel": "Cancel and return to menu"
+        }
       }
     },
     "error": {
@@ -587,7 +599,8 @@
       "invalid_fuel_unit": "Choose a supported unit.",
       "invalid_fuel_factor": "Provide a consistent verified energy conversion factor for this unit.",
       "invalid_fuel_basis": "Choose a valid energy basis for the fuel.",
-      "invalid_fuel_efficiency": "Check efficiency and HHV/LHV basis."
+      "invalid_fuel_efficiency": "Check efficiency and HHV/LHV basis.",
+      "beta_reset_confirmation": "Type RESET and enable confirmation to proceed."
     },
     "abort": {
       "draft_conflict": "Configuration or draft changed in another session. Reopen Configure to continue from the latest checkpoint.",
