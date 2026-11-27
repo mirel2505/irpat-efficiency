@@ -1,6 +1,7 @@
 """Register the local, administrator-only overview panel."""
 from pathlib import Path
 import asyncio
+import hashlib
 from copy import deepcopy
 import logging
 
@@ -27,6 +28,11 @@ _LOGGER = logging.getLogger(__name__)
 
 PANEL_PATH = "irpat-efficiency"
 ASSET_URL = "/irpat_efficiency_assets/panel.js"
+ASSET_FILE = Path(__file__).parent / "frontend" / "panel.js"
+
+
+def _asset_digest():
+    return hashlib.sha256(ASSET_FILE.read_bytes()).hexdigest()[:16]
 
 
 @websocket_api.websocket_command({
@@ -414,8 +420,10 @@ async def async_register(hass):
     """Register the API and static asset once per HA runtime."""
     runtime = hass.data[DOMAIN]
     if not runtime.get("static_registered"):
+        digest = await hass.async_add_executor_job(_asset_digest)
+        runtime["panel_asset_url"] = f"/irpat_efficiency_assets/{digest}/panel.js"
         await hass.http.async_register_static_paths([
-            StaticPathConfig(ASSET_URL, str(Path(__file__).parent / "frontend" / "panel.js"), False)
+            StaticPathConfig(runtime["panel_asset_url"], str(ASSET_FILE), False)
         ])
         runtime["static_registered"] = True
     if not runtime.get("api_registered"):
@@ -434,7 +442,7 @@ async def async_register(hass):
     if not runtime.get("panel_registered"):
         await panel_custom.async_register_panel(
             hass, frontend_url_path=PANEL_PATH,
-            webcomponent_name="irpat-efficiency-panel", module_url=ASSET_URL,
+            webcomponent_name="irpat-efficiency-panel", module_url=runtime["panel_asset_url"],
             sidebar_title="irPaT & Eficiență", sidebar_icon="mdi:heating-coil",
             require_admin=True, embed_iframe=False,
         )

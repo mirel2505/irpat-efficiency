@@ -32,9 +32,9 @@ async def test_graphical_configuration(hass, hass_ws_client, enable_custom_integ
     response = await call("configuration")
     assert response["success"], response
     state = response["result"]
-    async def action(name, **payload):
+    async def action(operation, **payload):
         nonlocal state
-        result = await call("configuration_action", revision=state["revision"], action=name, payload=payload)
+        result = await call("configuration_action", revision=state["revision"], action=operation, payload=payload)
         assert result["success"], result
         state = result["result"]
         return state["topology"]
