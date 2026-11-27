@@ -85,3 +85,26 @@ async def test_journal_profile_survive_reload(hass: HomeAssistant, hass_ws_clien
     assert result["rows"][0]["reference_lmin"] == 1.2
     assert result["rows"][0]["observed_lmin"] == 0.9
     assert abs(result["rows"][0]["difference_lmin"] + 0.3) < 1e-9
+
+
+async def test_non_admin_cannot_read_or_modify(hass: HomeAssistant, hass_ws_client,
+                                               hass_admin_user, enable_custom_integrations):
+    entry = MockConfigEntry(domain=DOMAIN, title="Test", data={}, options={"topology": empty_topology()})
+    entry.add_to_hass(hass)
+    assert await async_setup_component(hass, DOMAIN, {})
+    await hass.async_block_till_done()
+    client = await hass_ws_client(hass)
+    # Same permission downgrade used by Home Assistant's websocket tests.
+    hass_admin_user.groups = []
+    assert not hass_admin_user.is_admin
+    commands = [
+        {"type": f"{DOMAIN}/overview"},
+        {"type": f"{DOMAIN}/export_data", "entry_id": entry.entry_id, "format": "json"},
+        {"type": f"{DOMAIN}/journal_append", "entry_id": entry.entry_id,
+         "manifold_id": "unknown", "readings": {"unknown": 1}, "phase": "observation"},
+    ]
+    for sequence, command in enumerate(commands, 1):
+        await client.send_json({"id": sequence, **command})
+        result = await client.receive_json()
+        assert not result["success"], result
+        assert result["error"]["code"] == "unauthorized", result
