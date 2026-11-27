@@ -1,0 +1,40 @@
+{
+  "title": "irPaT & Eficiență",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurează locuința",
+        "description": "Creează o configurație locală. Nu se vor trimite comenzi instalației.",
+        "data": {
+          "name": "Denumirea locuinței",
+          "operating_mode": "Regim de funcționare",
+          "circuit_control": "Controlul circuitelor"
+        }
+      }
+    },
+    "error": {
+      "invalid_name": "Introdu o denumire validă."
+    },
+    "abort": {
+      "already_configured": "Integrarea este deja configurată."
+    }
+  },
+  "selector": {
+    "operating_mode": {
+      "options": {
+        "weather": "Meteoreglare (funcționare continuă)",
+        "fixed": "Temperatură fixă pe tur (funcționare continuă)",
+        "onoff": "Termostat ambiental ON/OFF",
+        "unknown": "Necunoscut"
+      }
+    },
+    "circuit_control": {
+      "options": {
+        "manual": "Reglaje manuale",
+        "open": "Actuatoare menținute deschise",
+        "automatic": "Actuatoare comandate automat",
+        "unknown": "Necunoscut"
+      }
+    }
+  }
+}
