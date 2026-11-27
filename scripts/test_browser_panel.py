@@ -4,7 +4,6 @@ The backend is mocked here; real Core WebSocket behavior is tested separately.
 """
 import json
 import os
-import base64
 from copy import deepcopy
 from pathlib import Path
 
@@ -231,13 +230,10 @@ def capture_documentation(browser):
     panel = page.locator("irpat-efficiency-panel")
     expect(panel.get_by_role("heading", name="Demo home", exact=True)).to_be_visible()
     def save(name):
-        data = page.screenshot(type="jpeg", quality=78, animations="disabled")
-        # Only opt-in CI documentation capture; base64 chunks allow a text-only
-        # repository client to recover exact image bytes without exposing user data.
-        encoded = base64.b64encode(data).decode("ascii")
-        for i in range(0, len(encoded), 1000):
-            print(f"THERMELYVO_SCREENSHOT {name} {i//1000:04d} {encoded[i:i+1000]}", flush=True)
-        print(f"THERMELYVO_SCREENSHOT_END {name} {len(encoded)}", flush=True)
+        destination = Path(__file__).resolve().parents[1] / "docs/images"
+        destination.mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=str(destination / f"{name}.jpg"), type="jpeg",
+                        quality=78, animations="disabled")
     save("dashboard")
     panel.get_by_role("button", name="Expert", exact=True).click()
     save("expert")
@@ -252,6 +248,6 @@ if __name__ == "__main__":
         browser = playwright.chromium.launch()
         for args in [("ro", 390, True), ("en", 1440, False)]:
             run_case(browser, *args)
-        if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("THERMELYVO_CAPTURE") == "1":
+        if os.environ.get("THERMELYVO_CAPTURE") == "1":
             capture_documentation(browser)
         browser.close()

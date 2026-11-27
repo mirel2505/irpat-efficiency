@@ -21,6 +21,11 @@ Local, read-only thermal and energy analytics for Home Assistant.
 
 ---
 
+<p align="center">
+  <a href="docs/images/dashboard.jpg"><img src="docs/images/dashboard.jpg" width="900" alt="THERMELYVO comfort dashboard showing room temperatures, targets and manual manifold flow readings"></a>
+  <br><sub>Actual integration UI · demonstration home with synthetic, partially configured sensor data</sub>
+</p>
+
 ## What it does
 
 THERMELYVO helps you understand, balance and optimize a hydronic heating or cooling system using your own Home Assistant sensors and manual flow readings.
@@ -51,6 +56,16 @@ A warm room and a cold room are not a reason to raise or lower the entire heatin
 ## Inside THERMELYVO
 
 The bilingual panel includes a compact comfort dashboard, guided configuration, room and circuit views, manual adjustment history and an expert analysis mode.
+
+<table>
+<tr>
+<td width="50%"><a href="docs/images/expert.jpg"><img src="docs/images/expert.jpg" alt="Expert view showing heat-source diagnostics"></a></td>
+<td width="50%"><a href="docs/images/setup.jpg"><img src="docs/images/setup.jpg" alt="Guided setup of floors, rooms, sensors, circuits and heating"></a></td>
+</tr>
+<tr><td align="center"><b>Expert analytics</b><br>Heat-source and energy diagnostics</td><td align="center"><b>Guided setup</b><br>Configure your home step by step</td></tr>
+</table>
+
+<sub>Captured from the actual dev7 frontend in Chromium with fictional measurements and mocked Home Assistant responses. Click an image to enlarge.</sub>
 
 - **Comfort:** room targets, temperature deviations and local history.
 - **Hydraulics:** manifolds, circuit flow records, adjustments and reference profiles.

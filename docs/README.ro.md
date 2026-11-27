@@ -14,6 +14,8 @@ Mai puțină complexitate. Mai multă eficiență.
 
 THERMELYVO este o integrare locală pentru Home Assistant, dedicată monitorizării, analizei și optimizării instalațiilor de încălzire și răcire cu agent termic.
 
+<p align="center"><a href="images/dashboard.jpg"><img src="images/dashboard.jpg" alt="Panoul THERMELYVO" width="900"></a><br><sub>Captură reală a interfeței, cu date demonstrative și configurare parțială.</sub></p>
+
 ## Ce face
 
 - Monitorizează temperaturile și țintele individuale ale încăperilor.
@@ -22,6 +24,8 @@ THERMELYVO este o integrare locală pentru Home Assistant, dedicată monitoriză
 - Recomandă analiza curbei meteo numai după echilibrarea relativă a încăperilor alimentate de aceeași sursă și confirmarea unei abateri termice generale.
 - Monitorizează turul, returul, puterea termică, energia, COP-ul și degivrările când există măsurători adecvate.
 - Oferă un configurator grafic, un panou simplu/expert, rapoarte și export de date.
+
+<table><tr><td width="50%"><a href="images/expert.jpg"><img src="images/expert.jpg" alt="Modul Expert"></a></td><td width="50%"><a href="images/setup.jpg"><img src="images/setup.jpg" alt="Configurare ghidată"></a></td></tr><tr><td align="center"><b>Analiză Expert</b></td><td align="center"><b>Configurare ghidată</b></td></tr></table>
 
 ## Filosofie
 
