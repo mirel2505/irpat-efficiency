@@ -134,6 +134,8 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
             entity = user_input.get("entity_id")
             if entity and (not isinstance(entity, str) or not entity.startswith("sensor.")):
                 errors["base"] = "invalid_entity"
+            elif entity and any(b["entity_id"] == entity for b in self._topology["bindings"]):
+                errors["base"] = "duplicate_entity"
             else:
                 if entity:
                     self._topology["outdoor_entity_id"] = entity
