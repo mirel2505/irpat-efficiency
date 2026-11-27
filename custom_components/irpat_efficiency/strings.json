@@ -94,7 +94,8 @@
           "telemetry_rooms": "Room sensors",
           "telemetry_sources": "Heat source sensors",
           "telemetry_manifolds": "Manifold sensors",
-          "source_settings": "Source properties and tariff"
+          "source_settings": "Source properties and tariff",
+          "mode_source": "Reported source mode"
         }
       },
       "floor": {
@@ -210,6 +211,25 @@
           "power_boundary_confirmed": "Confirm compatible power measurements",
           "energy_boundary_confirmed": "Confirm energy meter boundary"
         }
+      },
+      "mode_source": {
+        "title": "Choose source",
+        "data": {
+          "source_id": "Heat source"
+        }
+      },
+      "mode_mapping": {
+        "title": "Map reported source states",
+        "description": "Choose a sensor that reports actual operation, not just the selected mode. Enter exact raw state values. Leave unsupported states blank. Remove the sensor to disable this feature.",
+        "data": {
+          "entity_id": "Actual mode sensor",
+          "heating": "Heating",
+          "cooling": "Cooling",
+          "dhw": "Domestic hot water",
+          "standby": "Standby",
+          "defrost": "Defrost",
+          "off": "Off"
+        }
       }
     },
     "error": {
@@ -227,7 +247,8 @@
       "invalid_fluid": "Invalid fluid.",
       "invalid_fluid_properties": "Provide both valid properties for a known fluid.",
       "invalid_tariff": "Invalid tariff or currency code.",
-      "invalid_boundary": "Invalid confirmation."
+      "invalid_boundary": "Invalid confirmation.",
+      "invalid_mode_mapping": "Provide at least one valid, distinct raw state value."
     }
   }
 }
