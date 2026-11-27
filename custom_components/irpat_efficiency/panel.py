@@ -5,12 +5,14 @@ import logging
 from homeassistant.components import frontend, panel_custom, websocket_api
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import callback
+from homeassistant.util import dt as dt_util
 import voluptuous as vol
 
 from .const import DOMAIN
 from .topology import empty_topology
 from .temperature_reader import read_rooms
 from .telemetry_reader import read_telemetry
+from .live_diagnostics import live_diagnostics
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,11 +33,14 @@ def ws_overview(hass, connection, msg):
         history = hass.data[DOMAIN]["histories"].get(entry.entry_id)
         journal = hass.data[DOMAIN]["journals"].get(entry.entry_id)
         profiles = hass.data[DOMAIN]["profiles"].get(entry.entry_id)
+        rooms = read_rooms(hass, topology)
+        telemetry = read_telemetry(hass, topology)
         overview.append({"entry_id": entry.entry_id, "name": entry.title, "topology": topology,
                          "profiles": profiles.list_profiles() if profiles else [],
                          "journal": journal.recent() if journal else [],
-                         "room_temperatures": read_rooms(hass, topology),
-                         "telemetry": read_telemetry(hass, topology),
+                         "room_temperatures": rooms,
+                         "telemetry": telemetry,
+                         "live_diagnostics": live_diagnostics(topology, telemetry, rooms, dt_util.utcnow().timestamp()),
                          "history": history.overview(topology) if history else {},
                          "history_save_failed": history.save_failed if history else False,
                          "thermal_diagnostics": history.diagnostics(topology, journal.entries) if history and journal else {},
