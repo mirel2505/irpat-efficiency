@@ -19,3 +19,4 @@ jobs:
         with:
           node-version: '22'
       - run: node --check custom_components/irpat_efficiency/frontend/panel.js
+      - run: node scripts/check_ui_contracts.mjs
