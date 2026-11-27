@@ -3,6 +3,8 @@ from datetime import timedelta
 from copy import deepcopy
 import asyncio
 import logging
+import hashlib
+import json
 
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.storage import Store
@@ -13,6 +15,7 @@ from .history import compare_room, record_samples
 from .temperature_reader import read_rooms
 from .topology import empty_topology
 from .temperature import summarize_room
+from .zone_analysis import zone_diagnostics
 
 _LOGGER = logging.getLogger(__name__)
 # Provisional HA state-report freshness limit; not device measurement age.
@@ -29,6 +32,20 @@ class RoomHistory:
         self._lock = asyncio.Lock()
         self._closed = False
         self.save_failed = False
+        self.configuration_hash = None
+        self.configuration_since = None
+
+    @staticmethod
+    def fingerprint(topology):
+        return hashlib.sha256(json.dumps(topology, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+    def diagnostics(self, topology, journal):
+        since = self.configuration_since if self.configuration_hash == self.fingerprint(topology) else None
+        if self.save_failed:
+            since = None
+        now = dt_util.utcnow().timestamp()
+        return {mode: zone_diagnostics(topology, self.data, now, journal, since, mode)
+                for mode in ("heating", "cooling")}
 
     async def async_start(self):
         stored = await self.store.async_load()
@@ -36,6 +53,8 @@ class RoomHistory:
             if not isinstance(stored, dict) or not isinstance(stored.get("rooms"), dict):
                 raise ValueError("Invalid irPaT history store")
             self.data = stored["rooms"]
+            self.configuration_hash = stored.get("configuration_hash")
+            self.configuration_since = stored.get("configuration_since")
         self._cancel = async_track_time_interval(self.hass, self.async_sample, timedelta(minutes=5))
 
     async def async_sample(self, now):
@@ -43,6 +62,10 @@ class RoomHistory:
             if self._closed:
                 return
             topology = self.entry.options.get("topology", empty_topology())
+            fingerprint = self.fingerprint(topology)
+            if fingerprint != self.configuration_hash:
+                self.configuration_hash = fingerprint
+                self.configuration_since = dt_util.utcnow().timestamp()
             rooms = read_rooms(self.hass, topology)
             values = {}
             for identifier, room in rooms.items():
@@ -56,7 +79,9 @@ class RoomHistory:
                         values[identifier] = result["temperature_c"]
             record_samples(self.data, dt_util.utcnow().timestamp(), values)
             try:
-                await self.store.async_save({"rooms": deepcopy(self.data)})
+                await self.store.async_save({"rooms": deepcopy(self.data),
+                                             "configuration_hash": self.configuration_hash,
+                                             "configuration_since": self.configuration_since})
                 self.save_failed = False
             except Exception:
                 self.save_failed = True
