@@ -80,6 +80,16 @@ Official guide: https://contributors.home-assistant.io/marketplace/guides/integr
 - [ALGORITHMS.md](ALGORITHMS.md) — mathematical and validation contract
 - [ROADMAP.md](ROADMAP.md) — development milestones
 
+## Backup and recovery / Backup și restaurare
+
+Use **Settings → System → Backups** and include Home Assistant settings. The integration configuration and its seven per-entry HA Store files reside in the Home Assistant configuration directory. Preserve the native backup and encryption emergency kit outside the Home Assistant device.
+
+The integration's backup platform retries pending mode and defrost journal writes before native backup. Failures are logged; an ongoing system backup is not deliberately aborted. Only committed records can be recovered; this is not an atomic snapshot across all stores, and collection is not paused. No automatic backup scheduling, restore, or equipment command is performed by irPaT.
+
+Restoring Home Assistant settings can replace other system configuration and requires the native HA restore workflow. Keep a current backup before restoring. CSV and JSON exports are analysis archives, **not** directly restorable backups. No individual store import or partial overwrite is supported. Verify room bindings, history coverage, profiles, observations and source IDs after a native restore.
+
+See [official backup and restoration documentation](https://www.home-assistant.io/common-tasks/general/backups/). Actual backup archive contents and end-to-end restore must still be tested on an isolated Home Assistant installation before beta.
+
 ## Development
 
 Run the initial pure-Python calculation, topology, temperature, history and hydraulic journal unit tests from the repository root:
