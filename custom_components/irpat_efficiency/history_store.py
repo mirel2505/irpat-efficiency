@@ -12,7 +12,7 @@ from homeassistant.util import dt as dt_util
 from .const import DOMAIN
 from .history import compare_room
 from .history_persistence import current_series, save_sample
-from .temperature_reader import read_rooms, read_binding
+from .temperature_reader import MAX_REPORT_AGE_SECONDS, read_rooms, read_binding
 from .topology import empty_topology, temperature_conflicts
 from .temperature import summarize_room
 from .zone_analysis import zone_diagnostics
@@ -21,8 +21,6 @@ from .weather_history import daily_observations
 OUTDOOR_KEY = "__outdoor__"
 
 _LOGGER = logging.getLogger(__name__)
-# Provisional HA state-report freshness limit; not device measurement age.
-MAX_REPORT_AGE_SECONDS = 7200
 
 
 class RoomHistory:
@@ -100,8 +98,8 @@ class RoomHistory:
             values = {}
             for identifier, room in rooms.items():
                 fresh = [r for r in room["readings"]
-                         if r.get("age_seconds") is not None
-                         and r["age_seconds"] <= MAX_REPORT_AGE_SECONDS]
+                         if r.get("status") == "reported" and r.get("age_seconds") is not None
+                         and 0 <= r["age_seconds"] <= MAX_REPORT_AGE_SECONDS]
                 # Do not average a changing subset of sensors in history.
                 if fresh and len(fresh) == len(room["readings"]):
                     result = summarize_room(fresh)
@@ -110,8 +108,8 @@ class RoomHistory:
             entity_id = topology.get("outdoor_entity_id")
             if entity_id:
                 reading = read_binding(self.hass, {"entity_id": entity_id, "name": "Outdoor"})
-                if (reading.get("age_seconds") is not None
-                        and reading["age_seconds"] <= MAX_REPORT_AGE_SECONDS
+                if (reading.get("status") == "reported" and reading.get("age_seconds") is not None
+                        and 0 <= reading["age_seconds"] <= MAX_REPORT_AGE_SECONDS
                         and reading["temperature_c"] is not None):
                     values[OUTDOOR_KEY] = reading["temperature_c"]
             try:
