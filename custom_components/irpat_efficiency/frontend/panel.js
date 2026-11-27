@@ -9,6 +9,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
     this.loaded = false;
     this.busy = false;
     this.displayMode = 'heating';
+    this.historyHours = '24';
     this.timer = null;
   }
 
@@ -80,6 +81,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       .supply,.return{height:8px;border-radius:4px}.supply{background:#e57345}.return{background:#2196d3}
       .pipe{height:18px;width:4px;background:#8796a5;margin:auto}
       .status-within{color:var(--success-color,#22a06b)}.status-warm{color:var(--error-color,#e57345)}.status-cold{color:#2196d3}
+      .history{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:6px;margin:8px 0 14px;padding:8px;border-radius:8px;background:var(--secondary-background-color)}.history small{display:block}.history select{font:inherit;color:var(--primary-text-color);background:var(--card-background-color)}
       .temperature{text-align:right;flex-shrink:0}.temperature strong{font-size:1.2rem}.temperature small{display:block}
       .mode{display:flex;gap:8px;margin:16px 0}.mode button[aria-pressed="false"]{background:var(--secondary-background-color);color:var(--primary-text-color)}
       .label{overflow-wrap:anywhere}.room{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--divider-color)}
@@ -112,6 +114,13 @@ class IrpatEfficiencyPanel extends HTMLElement {
     for (const entry of this.entries) {
       const t = entry.topology;
       main.append(this.node("h2",entry.name));
+      if(entry.history_save_failed) main.append(this.node("p",this.t("Istoricul nu a putut fi salvat pe disc.","History could not be saved to disk."),"status-warm"));
+      const period=this.node("select");
+      period.setAttribute("aria-label",this.t("Interval istoric","History interval"));
+      for(const h of ["24","48","72","168"]){const option=this.node("option",h+" h");option.value=h;period.append(option);}
+      period.value=this.historyHours;
+      period.addEventListener("change",()=>{this.historyHours=period.value;this.render();});
+      const periodLabel=this.node("label",this.t("Interval statistic: ","Statistics interval: "));periodLabel.append(period);main.append(periodLabel);
       const grid = this.node("div",undefined,"grid");
       for (const [key,ro,en] of [["floors","Niveluri","Floors"],["rooms","Încăperi","Rooms"],["manifolds","Distribuitoare","Manifolds"],["circuits","Circuite","Circuits"],["zones","Zone","Zones"],["sources","Surse","Sources"]])
         grid.append(this.card(this.t(ro,en),(t[key]||[]).length));
@@ -144,6 +153,20 @@ class IrpatEfficiencyPanel extends HTMLElement {
             this.node("small",labels[status]+(delta==null?"":" · "+(delta>0?"+":"")+delta.toFixed(1)+" °C"),"status-"+status));
           row.append(left,right);
           section.append(row);
+          const hist=entry.history?.[room.id];
+          const stats=hist?.windows?.[this.historyHours];
+          if(hist){
+            const format=v=>v==null?"—":v.toFixed(1)+" °C";
+            const prev=hist.yesterday_same_slot_c;
+            const historyBox=this.node("div",undefined,"history");
+            const cells=[[this.t("Ieri, aceeași oră (5 min)","Yesterday, same time (5 min)"),format(prev)],
+              [this.t("Diferență față de ieri","Difference from yesterday"),prev==null||value?.temperature_c==null?"—":format(value.temperature_c-prev)],
+              [this.t("Medie eșantioane","Sample mean"),format(stats?.mean_c)],
+              [this.t("Min. / Max.","Min. / Max."),format(stats?.min_c)+" / "+format(stats?.max_c)],
+              [this.t("Acoperire","Coverage"),stats?.coverage==null?"—":Math.round(stats.coverage*100)+"% ("+stats.count+"/"+stats.expected+")"]];
+            for(const [caption,val] of cells){const cell=this.node("div");cell.append(this.node("small",caption,"muted"),this.node("strong",val));historyBox.append(cell);}
+            section.append(historyBox);
+          }
         }
         for (const manifold of (t.manifolds||[]).filter(m=>m.floor_id===floor.id)) {
           section.append(this.node("h3",manifold.name));
@@ -163,7 +186,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
         main.append(section);
       }
     }
-    main.append(this.node("p",this.t("Temperaturile sunt instantanee (media citirilor disponibile), cu toleranță provizorie ±0,3°C. Vechimea citirilor este afișată, dar nu este încă filtrată automat. Debitele și istoricul nu sunt încă disponibile. Nu se transmit comenzi instalației.","Temperatures are snapshots (mean of available readings), with provisional ±0.3°C tolerance. Reading age is shown but not yet automatically filtered. Flows and history are not yet available. No commands are sent to equipment."),"muted"));
+    main.append(this.node("p",this.t("Temperaturile sunt instantanee (media citirilor disponibile), cu toleranță provizorie ±0,3°C. Vechimea citirilor este afișată, dar nu este încă filtrată automat. Istoricul local eșantionează la 5 minute, păstrează 8 zile și exclude rapoartele HA mai vechi de 2 ore; golurile rămân vizibile. Debitele nu sunt încă disponibile. Nu se transmit comenzi instalației.","Temperatures are snapshots (mean of available readings), with provisional ±0.3°C tolerance. Reading age is shown but not yet automatically filtered. Local history samples every 5 minutes, retains 8 days and excludes HA reports older than 2 hours; gaps remain visible. Flows are not yet available. No commands are sent to equipment."),"muted"));
     root.append(main);
   }
 }
