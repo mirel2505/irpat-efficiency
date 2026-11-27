@@ -4,15 +4,22 @@ from __future__ import annotations
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_NAME
+from homeassistant.core import callback
 from homeassistant.helpers import selector
 
 from .const import CIRCUIT_CONTROLS, DOMAIN, OPERATING_MODES
+from .options_flow import IrpatOptionsFlow
 
 
 class IrpatConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Create a local installation."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        return IrpatOptionsFlow()
 
     async def async_step_user(self, user_input=None):
         """Configure the home and operating assumptions."""
