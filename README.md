@@ -9,13 +9,13 @@ Local, advisory-only Home Assistant integration for hydronic radiant floor heati
 ## Stadiu / Status
 
 **0.1.0.dev0 — experimental foundation, not ready for installation on a production system.**
-Initial configuration entry and calculation primitives are implemented. The dedicated panel, sensor selection, historical data, balancing assistant and reports are not yet implemented. Marketplace metadata (hacs.json) is present; installation has not been validated. No release is available.
+Initial configuration entry, topology model, native options forms for adding floors, zones, rooms, manifolds, circuits, sources and ambient temperature bindings, and calculation primitives are implemented in source. Native forms are not yet validated on Home Assistant. The dedicated graphical panel, complete configuration editing, data collection, historical data, balancing assistant and reports are not yet implemented. Marketplace metadata (hacs.json) is present; installation has not been validated. No release is available.
 
 ## Principii / Principles
 
 - Local, read-only towards physical equipment; manual adjustments by the user.
 - Manufacturer-independent, with optional sensor inputs and user-defined names.
-- Multiple floors, manifolds and independent hydraulic zones are planned.
+- The initial topology model supports multiple floors, manifolds and independent hydraulic zones.
 - Full balancing method: continuous weather compensation with open circuits; fixed supply with continuous operation has limited support; ON/OFF-controlled systems remain monitoring-only.
 - No mandatory YAML, no hardcoded personal configuration, no cloud subscription.
 
@@ -42,7 +42,7 @@ Official guide: https://contributors.home-assistant.io/marketplace/guides/integr
 
 ## Development
 
-Run the initial pure-Python unit tests from the repository root:
+Run the initial pure-Python calculation and topology unit tests from the repository root:
 
 ```sh
 python -m unittest discover -s tests -v
