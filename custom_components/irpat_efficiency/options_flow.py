@@ -11,6 +11,7 @@ from homeassistant.helpers import selector
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN, OPERATING_MODES, CIRCUIT_CONTROLS
+from .storage_identity import generation, storage_key, fresh_options
 from .topology import SOURCE_TYPES, TopologyError, add_item, empty_topology
 from .topology_edit import EDIT_FIELDS, OPTIONAL_FIELDS, edit_item
 from .topology_remove import removal_preview, remove_selection
@@ -39,9 +40,10 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
         """Open the configuration menu."""
         if not hasattr(self, "_topology"):
+            self._base_generation = generation(self.config_entry)
             self._base = deepcopy(self.config_entry.options.get("topology", empty_topology()))
             self._topology = deepcopy(self._base)
-            self._draft_store = Store(self.hass, 1, f"{DOMAIN}.configuration_draft.{self.config_entry.entry_id}", private=True, atomic_writes=True)
+            self._draft_store = Store(self.hass, 1, storage_key(self.config_entry, "configuration_draft"), private=True, atomic_writes=True)
             locks = self.hass.data.setdefault(DOMAIN, {}).setdefault("draft_locks", {})
             self._draft_lock = locks.setdefault(self.config_entry.entry_id, asyncio.Lock())
             async with self._draft_lock:
@@ -90,6 +92,7 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
             menu.append("remove")
         if self._topology != self._base:
             menu.append("discard_draft")
+        menu.append("beta_reset")
         menu.append("save")
         # Keep a fixed overview; expert actions remain available without a migration.
         menu.insert(menu.index("save"), "overview_menu")
@@ -101,7 +104,7 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
             "hydraulics_menu": ("zone", "manifold", "circuit", "telemetry_manifolds"),
             "rooms_menu": ("room", "room_setup", "discover_sensors", "binding", "telemetry_rooms"),
             "sources_menu": ("source", "source_settings", "telemetry_sources", "mode_source", "economic_source", "hybrid_zone"),
-            "manage_menu": ("edit", "remove", "discard_draft"),
+            "manage_menu": ("edit", "remove", "discard_draft", "beta_reset"),
         }
         summary = {
             "floors": str(len(t["floors"])), "rooms": str(len(t["rooms"])),
@@ -155,7 +158,7 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
         """Persist completed steps before showing the next page; no live options writes."""
         async with self._draft_lock:
             current = self.config_entry.options.get("topology", empty_topology())
-            if current != self._base:
+            if current != self._base or generation(self.config_entry) != self._base_generation:
                 self._draft_error = "draft_conflict"
                 return False
             try:
@@ -173,6 +176,28 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
                 self._draft_error = "draft_write_failed"
                 return False
 
+    async def async_step_beta_reset(self, user_input=None):
+        """Explicitly replace all active options and isolate the next test session."""
+        errors = {}
+        if user_input is not None:
+            if user_input.get("cancel") is True:
+                return await self.async_step_init()
+            if user_input.get("confirmation", "").strip() != "RESET":
+                errors["base"] = "beta_reset_confirmation"
+            elif user_input.get("confirmed") is not True:
+                errors["base"] = "beta_reset_confirmation"
+            elif not await self._checkpoint():
+                return self.async_abort(reason=self._draft_error)
+            else:
+                # Core commits options and reloads this entry. The old generation
+                # stays isolated; no registry writes or filesystem deletion.
+                return self.async_create_entry(title="", data=fresh_options())
+        return self.async_show_form(step_id="beta_reset", data_schema=vol.Schema({
+            vol.Required("confirmation"): selector.TextSelector(),
+            vol.Required("confirmed", default=False): selector.BooleanSelector(),
+            vol.Optional("cancel", default=False): selector.BooleanSelector(),
+        }), errors=errors)
+
     async def async_step_discard_draft(self, user_input=None):
         errors = {}
         if user_input is not None:
@@ -180,6 +205,7 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
                 async with self._draft_lock:
                     try:
                         if (self.config_entry.options.get("topology", empty_topology()) != self._base
+                                or generation(self.config_entry) != self._base_generation
                                 or await self._draft_store.async_load() != self._last_draft):
                             return self.async_abort(reason="draft_conflict")
                         # A durable base checkpoint avoids stale Store caches on older Core.
@@ -464,9 +490,9 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_zone(self, user_input=None):
         return await self._add("zone", "zones", {
-            vol.Required("operating_mode", default=self.config_entry.data.get("operating_mode", "unknown")):
+            vol.Required("operating_mode", default="unknown" if generation(self.config_entry) else self.config_entry.data.get("operating_mode", "unknown")):
                 _choices(OPERATING_MODES, "operating_mode"),
-            vol.Required("circuit_control", default=self.config_entry.data.get("circuit_control", "unknown")):
+            vol.Required("circuit_control", default="unknown" if generation(self.config_entry) else self.config_entry.data.get("circuit_control", "unknown")):
                 _choices(CIRCUIT_CONTROLS, "circuit_control"),
         }, user_input)
 
