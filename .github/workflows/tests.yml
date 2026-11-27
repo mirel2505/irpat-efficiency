@@ -21,3 +21,4 @@ jobs:
       - run: node --check custom_components/irpat_efficiency/frontend/panel.js
       - run: node scripts/check_ui_contracts.mjs
       - run: node scripts/test_panel_behavior.mjs
+      - run: python scripts/check_package.py
