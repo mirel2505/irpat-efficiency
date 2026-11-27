@@ -38,3 +38,23 @@ def matched_heat(before, after):
             and m2['observed_at']-m1['observed_at'] <= 360):
         return None, None
     return m1['mode'], (p1+p2)/2*(u2-u1)/3600000
+
+
+def pair_signature(topology, source_id):
+    """JSON-stable measurement identity, independent of sensor availability."""
+    source = next((s for s in topology.get('sources', []) if s['id'] == source_id), {})
+    binding = source.get('mode_binding')
+    if (source.get('source_type') != 'heat_pump' or not binding
+            or source.get('power_boundary_confirmed') is not True
+            or source.get('energy_boundary_confirmed') is not True):
+        return None
+    bindings = [b for b in topology.get('telemetry', []) if b['group'] == 'sources']
+    roles = ('electrical_energy', 'electrical_power', 'thermal_power')
+    selected = {b['role']: b['entity_id'] for b in bindings
+                if b['owner_id'] == source_id and b['role'] in roles}
+    if not all(role in selected for role in roles) or len(set(selected.values())) != len(roles):
+        return None
+    if any(b['owner_id'] != source_id and b['entity_id'] in selected.values()
+           for b in bindings):
+        return None
+    return {'meters': selected, 'mode': binding}
