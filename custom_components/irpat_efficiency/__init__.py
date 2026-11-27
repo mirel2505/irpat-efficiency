@@ -17,9 +17,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .journal_store import HydraulicJournal
     from .profile_store import ProfileStore
     from .defrost_monitor import DefrostMonitor
+    from .energy_monitor import EnergyMonitor
     from homeassistant.helpers.storage import Store
 
-    runtime = hass.data.setdefault(DOMAIN, {"active_entries": set(), "histories": {}, "journals": {}, "profiles": {}, "defrost_monitors": {}})
+    runtime = hass.data.setdefault(DOMAIN, {"active_entries": set(), "histories": {}, "journals": {}, "profiles": {}, "defrost_monitors": {}, "energy_monitors": {}})
     journal = HydraulicJournal(Store(hass, 1, f"{DOMAIN}.journal.{entry.entry_id}"))
     await journal.async_load()
     profiles = ProfileStore(Store(hass, 1, f"{DOMAIN}.profiles.{entry.entry_id}"))
@@ -27,13 +28,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     history = RoomHistory(hass, entry)
     await history.async_start()
     monitor = DefrostMonitor(hass, entry)
+    energy = EnergyMonitor(hass, entry)
     try:
         await monitor.async_start()
+        await energy.async_start()
         await panel.async_register(hass)
     except Exception:
+        await energy.async_stop()
         await monitor.async_stop()
         await history.async_stop()
         raise
+    runtime["energy_monitors"][entry.entry_id] = energy
     runtime["defrost_monitors"][entry.entry_id] = monitor
     runtime["profiles"][entry.entry_id] = profiles
     runtime["journals"][entry.entry_id] = journal
@@ -48,6 +53,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     runtime = hass.data.get(DOMAIN)
     if runtime:
+        energy = runtime["energy_monitors"].pop(entry.entry_id, None)
+        if energy is not None:
+            await energy.async_stop()
         monitor = runtime["defrost_monitors"].pop(entry.entry_id, None)
         if monitor is not None:
             await monitor.async_stop()
