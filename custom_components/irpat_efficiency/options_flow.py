@@ -10,6 +10,7 @@ from homeassistant.helpers import selector
 from .const import OPERATING_MODES, CIRCUIT_CONTROLS
 from .topology import SOURCE_TYPES, TopologyError, add_item, empty_topology
 from .topology_edit import EDIT_FIELDS, OPTIONAL_FIELDS, edit_item
+from .topology_remove import remove_item
 from .telemetry import ROLE_GROUPS, set_binding
 from .source_settings import FLUID_TYPES, set_source_settings
 from .operation_mode import MODES, configure_mode
@@ -50,6 +51,7 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
                 menu.append(f"telemetry_{group}")
         if any(t[group] for group in EDIT_FIELDS):
             menu.append("edit")
+            menu.append("remove")
         menu.append("save")
         return self.async_show_menu(step_id="init", menu_options=menu)
 
@@ -59,6 +61,32 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
                      for item in self._topology[collection]],
             multiple=multiple, mode=selector.SelectSelectorMode.DROPDOWN,
         ))
+
+    async def async_step_remove(self, user_input=None):
+        collections = [key for key in EDIT_FIELDS if self._topology[key]]
+        if user_input is not None and user_input.get("collection") in collections:
+            self._remove_collection = user_input["collection"]
+            return await self.async_step_remove_item()
+        return self.async_show_form(step_id="remove", data_schema=vol.Schema({
+            vol.Required("collection"): _choices(collections, "edit_collection"),
+        }), errors={"base": "invalid_reference"} if user_input is not None else {})
+
+    async def async_step_remove_item(self, user_input=None):
+        collection = getattr(self, "_remove_collection", None)
+        if collection not in EDIT_FIELDS or not self._topology[collection]:
+            return await self.async_step_init()
+        errors = {}
+        if user_input is not None:
+            try:
+                self._topology = remove_item(self._topology, collection, user_input["item_id"],
+                                             confirmed=user_input.get("confirmed", False))
+                return await self.async_step_init()
+            except TopologyError as exc:
+                errors["base"] = str(exc)
+        return self.async_show_form(step_id="remove_item", data_schema=vol.Schema({
+            vol.Required("item_id"): self._reference(collection),
+            vol.Required("confirmed", default=False): selector.BooleanSelector(),
+        }), errors=errors)
 
     async def async_step_edit(self, user_input=None):
         """Choose which kind of existing item to edit."""
