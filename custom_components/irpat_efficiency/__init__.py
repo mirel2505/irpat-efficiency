@@ -5,6 +5,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from .const import DOMAIN
+from .storage_identity import storage_key
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -45,9 +46,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.warning("Entry already initialized or awaiting cleanup: %s", eid)
         return False
     factories = (
-        lambda: ReportStore(Store(hass, 1, f"{DOMAIN}.reports.{eid}")),
-        lambda: HydraulicJournal(Store(hass, 1, f"{DOMAIN}.journal.{eid}")),
-        lambda: ProfileStore(Store(hass, 1, f"{DOMAIN}.profiles.{eid}")),
+        lambda: ReportStore(Store(hass, 1, storage_key(entry, "reports"))),
+        lambda: HydraulicJournal(Store(hass, 1, storage_key(entry, "journal"))),
+        lambda: ProfileStore(Store(hass, 1, storage_key(entry, "profiles"))),
         lambda: RoomHistory(hass, entry),
         lambda: DefrostMonitor(hass, entry),
         lambda: EnergyMonitor(hass, entry),
