@@ -6,6 +6,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
+from .storage_identity import storage_key
 from .energy_store import EnergyStore
 from .fuel_monitor import FuelMonitor
 from .mode_history import observation
@@ -21,7 +22,7 @@ class EnergyMonitor:
     def __init__(self, hass, entry):
         self.hass = hass
         self.entry = entry
-        self.history = EnergyStore(Store(hass, 1, f"{DOMAIN}.energy.{entry.entry_id}"))
+        self.history = EnergyStore(Store(hass, 1, storage_key(entry, "energy")))
         self.fuel = FuelMonitor(hass, entry)
         self.fuel_save_failed = False
         self.cancel = None
