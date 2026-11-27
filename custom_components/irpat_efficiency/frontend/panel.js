@@ -15,6 +15,11 @@ class IrpatEfficiencyPanel extends HTMLElement {
     this.journalDrafts = new Map();
     this.exportUrls = new Set();
     this.journalSaving = false;
+    this.setup = null;
+    this.setupBusy = false;
+    this.setupStep = 0;
+    this.setupMessage = '';
+    this.setupError = '';
   }
 
   set hass(value) {
@@ -35,7 +40,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
   }
 
   async refresh(quiet = false) {
-    if (!this._hass || this.busy || this.journalSaving || (quiet && this.shadowRoot.querySelector('details.journal[open]'))) return;
+    if (!this._hass || this.busy || this.journalSaving || this.setup || this.setupBusy || (quiet && this.shadowRoot.querySelector('details.journal[open]'))) return;
     this.busy = true;
     if (!quiet) this.render();
     try {
@@ -722,6 +727,249 @@ class IrpatEfficiencyPanel extends HTMLElement {
     return box;
   }
 
+  async openSetup(entry) {
+    if (this.setupBusy || this.busy || this.journalSaving) return;
+    this.setupBusy = true;
+    this.setupError = '';
+    this.setupMessage = '';
+    try {
+      this.setup = await this._hass.callWS({type:"irpat_efficiency/configuration",entry_id:entry.entry_id});
+      this.setupEntry = entry.entry_id;
+      this.setupStep = 0;
+    } catch (e) {
+      this.setupError = this.t("Configurarea nu a putut fi deschisă.","Could not open setup.")+" "+String(e?.message||"");
+    } finally { this.setupBusy=false; this.render(); }
+  }
+
+  async setupAction(action,payload) {
+    if(this.setupBusy || !this.setup) return;
+    this.setupBusy=true; this.setupError=''; this.setupMessage='';
+    const buttons=[...this.shadowRoot.querySelectorAll(".setup button")];
+    buttons.forEach(b=>b.disabled=true);
+    try {
+      this.setup=await this._hass.callWS({type:"irpat_efficiency/configuration_action",
+        entry_id:this.setupEntry,revision:this.setup.revision,action,payload});
+      this.setupMessage=this.t("✓ Modificare salvată","✓ Change saved");
+    } catch(e) {
+      const messages={
+        object_in_use:this.t("Elementul este încă folosit. Elimină mai întâi legăturile către senzori, circuite sau distribuitoare.","This item is still in use. Remove its sensor, circuit or distributor links first."),
+        duplicate_entity:this.t("Acest senzor este deja folosit.","This sensor is already in use."),
+        configuration_changed:this.t("Configurația s-a schimbat. Se încarcă datele actuale; repetă acțiunea.","Configuration changed. Reloading the latest data; repeat the action."),
+        invalid_position:this.t("Verifică numărul sau poziția circuitului.","Check circuit count or position."),
+        duplicate_position:this.t("Această poziție există deja.","This position already exists."),
+        invalid_number:this.t("Verifică valorile numerice.","Check the numeric values."),
+        invalid_name:this.t("Introdu un nume valid.","Enter a valid name."),
+      };
+      this.setupError=messages[e?.code]||this.t("Nu s-a putut salva: ","Could not save: ")+String(e?.message||e?.code||"");
+      if(e?.code==="configuration_changed") {
+        try { this.setup=await this._hass.callWS({type:"irpat_efficiency/configuration",entry_id:this.setupEntry}); } catch {}
+      } else {
+        // Keep the form and its values available for correction.
+        buttons.forEach(b=>b.disabled=false);
+        const msg=this.shadowRoot.querySelector(".setup-error");
+        if(msg) msg.textContent=this.setupError;
+        this.setupBusy=false;
+        return;
+      }
+    }
+    this.setupBusy=false; this.render();
+  }
+
+  setupField(form,label,type,value="",options=[]) {
+    const wrap=this.node("label",label);
+    const field=this.node(type==="select"?"select":"input");
+    if(type==="select") for(const [id,name] of options){const o=this.node("option",name);o.value=id;field.append(o);}
+    else {field.type=type; if(type==="number")field.step="any";}
+    field.value=value??"";
+    wrap.append(field);form.append(wrap);return field;
+  }
+
+  setupForm(parent,caption,action) {
+    const form=this.node("form",undefined,"setup-form");
+    const button=this.node("button",caption);button.type="submit";
+    form.addEventListener("submit",e=>{e.preventDefault();action();});
+    parent.append(form);
+    return {form,finish:()=>form.append(button)};
+  }
+
+  setupButton(parent,label,action,secondary=false) {
+    const button=this.node("button",label,secondary?"secondary":"");button.type="button";
+    button.addEventListener("click",action);parent.append(button);return button;
+  }
+
+  setupRemove(parent,collection,id,name) {
+    const details=this.node("details",undefined,"remove-confirm");
+    details.append(this.node("summary",this.t("Elimină","Remove")));
+    details.append(this.node("p",this.t("Elimini din irPaT: ","Remove from irPaT: ")+name));
+    this.setupButton(details,this.t("Confirmă eliminarea","Confirm removal"),
+      ()=>this.setupAction("remove",{collection,id,confirmed:true}),true);
+    parent.append(details);
+  }
+
+  renderSetup(main) {
+    const d=this.setup,t=d.topology;
+    const box=this.node("section",undefined,"setup");
+    main.append(box);
+    const head=this.node("div",undefined,"setup-head");
+    head.append(this.node("h2",this.t("Configurează casa","Set up your home")));
+    this.setupButton(head,this.t("Înapoi la dashboard","Back to dashboard"),()=>{this.setup=null;this.setupMessage='';this.setupError='';this.refresh();},true);
+    box.append(head,this.node("p",this.t("Fiecare modificare confirmată se salvează automat. Nu trimitem comenzi instalației.","Every confirmed change is saved automatically. No equipment commands are sent."),"muted"));
+    const steps=[
+      ["🏠",this.t("Casa","Home"),t.floors.length>0],
+      ["🛏️",this.t("Camere","Rooms"),t.rooms.length>0],
+      ["🌡️",this.t("Senzori","Sensors"),t.rooms.length>0&&t.rooms.every(r=>t.bindings.some(b=>b.room_id===r.id))],
+      ["🔧",this.t("Circuite","Loops"),t.manifolds.length>0&&t.circuits.length>0&&t.circuits.every(c=>c.room_id)],
+      ["♨️",this.t("Încălzire","Heating"),t.sources.length>0],
+      ["✓",this.t("Verificare","Review"),false],
+    ];
+    const nav=this.node("nav",undefined,"setup-nav");
+    steps.forEach(([icon,label,done],i)=>{
+      const b=this.setupButton(nav,icon+" "+label+(done?" ✓":""),()=>{this.setupStep=i;this.setupError='';this.render();},true);
+      b.setAttribute("aria-current",i===this.setupStep?"step":"false");
+    });
+    box.append(nav);
+    const status=this.node("p",this.setupMessage,"status-within");
+    status.setAttribute("role","status");box.append(status);
+    const error=this.node("p",this.setupError,"setup-error status-warm");error.setAttribute("role","alert");box.append(error);
+    const section=this.node("section",undefined,"card");
+    const blank=this.t("Alege…","Choose…");
+    const choices=(items)=>items.map(x=>[x.id,x.name]);
+    const num=(field)=>field.value===""?null:Number(field.value);
+    const floorOptions=choices(t.floors),roomOptions=choices(t.rooms);
+    const sensorOptions=(room, outdoor=false)=>{
+      const area=t.rooms.find(r=>r.id===room)?.ha_area_id;
+      const used=new Set([...t.bindings.map(b=>b.entity_id),...(t.telemetry||[]).map(b=>b.entity_id),t.outdoor_entity_id]);
+      return d.entities.filter(e=>!used.has(e.entity_id)&&(!outdoor||e.entity_id.startsWith("sensor.")))
+        .sort((a,b)=>Number(!!area&&b.area_id===area)-Number(!!area&&a.area_id===area)||a.name.localeCompare(b.name))
+        .map(e=>[e.entity_id,(area&&e.area_id===area?"★ ":"")+e.name+" · "+(e.temperature_c==null?"—":e.temperature_c.toFixed(1)+" °C")+" ("+e.entity_id+")"]);
+    };
+    section.append(this.node("h2",steps[this.setupStep][0]+" "+steps[this.setupStep][1]));
+    if(this.setupStep===0) {
+      section.append(this.node("p",this.t("Importă etajele și camerele existente sau adaugă etaje manual. Senzorii unici sau desemnați în Home Assistant sunt asociați automat.","Import existing floors and rooms or add floors manually. Unique or designated Home Assistant sensors are linked automatically.")));
+      const areas=Object.values(d.native_areas),nativeFloors=Object.keys(d.native_floors);
+      if(areas.length||nativeFloors.length){
+        const f=this.setupForm(section,this.t("Importă din Home Assistant","Import from Home Assistant"),()=>this.setupAction("import",{
+          ...(fallback?.value?{fallback_floor:fallback.value}:{}),
+          ...(fallbackName?.value.trim()?{fallback_name:fallbackName.value.trim()}:{}),
+        }));
+        f.form.append(this.node("p",areas.length+" "+this.t("încăperi disponibile","available rooms")));
+        let fallback=null,fallbackName=null;
+        if(areas.some(a=>!nativeFloors.includes(a.floor_id))){
+          if(t.floors.length)fallback=this.setupField(f.form,this.t("Etaj pentru camere fără etaj în HA","Floor for rooms without an HA floor"),"select",t.floors[0].id,[["",this.t("Nu importa aceste camere","Skip these rooms")],...floorOptions]);
+          else fallbackName=this.setupField(f.form,this.t("Nume etaj pentru camere fără etaj","Floor name for rooms without a floor"),"text",this.t("Parter","Ground floor"));
+        }
+        f.finish();
+      }
+      for(const floor of t.floors){
+        const row=this.node("div",undefined,"setup-item");row.append(this.node("strong","🏠 "+floor.name));
+        const f=this.setupForm(row,this.t("Aplică numele","Apply name"),()=>this.setupAction("rename",{collection:"floors",id:floor.id,name:name.value}));
+        const name=this.setupField(f.form,this.t("Nume etaj","Floor name"),"text",floor.name);name.required=true;f.finish();
+        this.setupRemove(row,"floors",floor.id,floor.name);section.append(row);
+      }
+      const f=this.setupForm(section,this.t("Adaugă etaj","Add floor"),()=>this.setupAction("add_floor",{name:name.value}));
+      const name=this.setupField(f.form,this.t("Nume etaj nou","New floor name"),"text");name.required=true;f.finish();
+    }
+    if(this.setupStep===1){
+      section.append(this.node("p",this.t("Adaugă camere și stabilește temperaturile dorite. Suprafața este opțională.","Add rooms and set desired temperatures. Floor area is optional.")));
+      for(const room of t.rooms){
+        const row=this.node("details",undefined,"setup-item");
+        const temp=d.room_temperatures[room.id]?.heating?.temperature_c;
+        row.append(this.node("summary","🛏️ "+room.name+" · "+(temp==null?"—":temp.toFixed(1)+" °C")));
+        const f=this.setupForm(row,this.t("Aplică modificările","Apply changes"),()=>this.setupAction("edit_room",{id:room.id,name:name.value,area_m2:num(area),heating_target_c:num(heat),cooling_target_c:num(cool)}));
+        const name=this.setupField(f.form,this.t("Nume","Name"),"text",room.name);name.required=true;
+        const area=this.setupField(f.form,this.t("Suprafață (m²)","Area (m²)"),"number",room.area_m2);
+        const heat=this.setupField(f.form,this.t("Temperatură dorită iarna (°C)","Desired winter temperature (°C)"),"number",room.heating_target_c);
+        const cool=this.setupField(f.form,this.t("Temperatură dorită vara (°C)","Desired summer temperature (°C)"),"number",room.cooling_target_c);
+        f.finish();this.setupRemove(row,"rooms",room.id,room.name);section.append(row);
+      }
+      if(t.floors.length){
+        const f=this.setupForm(section,this.t("Adaugă cameră","Add room"),()=>this.setupAction("add_room",{name:name.value,floor_id:floor.value}));
+        const name=this.setupField(f.form,this.t("Nume cameră nouă","New room name"),"text");name.required=true;
+        const floor=this.setupField(f.form,this.t("Etaj","Floor"),"select",t.floors[0].id,floorOptions);f.finish();
+      }else section.append(this.node("p",this.t("Adaugă mai întâi un etaj în pasul Casa.","Add a floor in the Home step first.")));
+    }
+    if(this.setupStep===2){
+      section.append(this.node("p",this.t("Alege senzorul care măsoară temperatura reală. ★ indică un senzor din aceeași încăpere Home Assistant.","Choose the sensor measuring the actual temperature. ★ indicates a sensor in the same Home Assistant area.")));
+      for(const room of t.rooms){
+        const row=this.node("div",undefined,"setup-item");
+        const current=d.room_temperatures[room.id]?.heating?.temperature_c;
+        row.append(this.node("strong",room.name+" · "+(current==null?"—":current.toFixed(1)+" °C")));
+        const bindings=t.bindings.filter(b=>b.room_id===room.id);
+        if(!bindings.length)row.append(this.node("p",this.t("Niciun senzor asociat","No sensor linked"),"muted"));
+        for(const binding of bindings){
+          const reading=d.room_temperatures[room.id]?.readings?.find(x=>x.entity_id===binding.entity_id);
+          row.append(this.node("p",binding.name+" · "+(reading?.temperature_c==null?this.t("Citire indisponibilă","Reading unavailable"):reading.temperature_c.toFixed(1)+" °C")));
+          this.setupRemove(row,"bindings",binding.id,binding.name);
+        }
+        const f=this.setupForm(row,this.t("Asociază senzor","Link sensor"),()=>this.setupAction("bind",{room_id:room.id,entity_id:sel.value}));
+        const sel=this.setupField(f.form,this.t("Senzor temperatură","Temperature sensor"),"select","",[["",blank],...sensorOptions(room.id)]);sel.required=true;f.finish();section.append(row);
+      }
+      const f=this.setupForm(section,this.t("Aplică senzorul exterior","Apply outdoor sensor"),()=>this.setupAction("outdoor",{entity_id:out.value||null}));
+      const existing=d.entities.find(e=>e.entity_id===t.outdoor_entity_id);
+      const out=this.setupField(f.form,this.t("Temperatură exterioară (opțional)","Outdoor temperature (optional)"),"select",t.outdoor_entity_id||"",[["",this.t("Niciunul","None")],...(t.outdoor_entity_id?[[t.outdoor_entity_id,existing?.name||t.outdoor_entity_id]]:[]),...sensorOptions(null,true)]);f.finish();
+    }
+    if(this.setupStep===3){
+      section.append(this.node("p",this.t("Distribuitorul este piesa din care pleacă țevile către camere. Alege camera pentru fiecare circuit; nu ghicim traseele.","The distributor is where the floor pipes branch to rooms. Choose the room for each loop; pipe routes are never guessed.")));
+      for(const m of t.manifolds){
+        const row=this.node("div",undefined,"setup-item");
+        row.append(this.node("h3",m.name));
+        const rename=this.setupForm(row,this.t("Aplică numele","Apply name"),()=>this.setupAction("rename",{collection:"manifolds",id:m.id,name:mn.value}));
+        const mn=this.setupField(rename.form,this.t("Nume distribuitor","Distributor name"),"text",m.name);mn.required=true;rename.finish();
+        const circuits=t.circuits.filter(c=>c.manifold_id===m.id).sort((a,b)=>a.position-b.position);
+        const diagram=this.node("div",undefined,"loops setup-diagram");
+        for(const c of circuits){
+          const loop=this.node("div",undefined,"loop");loop.append(this.node("strong",String(c.position)),this.node("div",undefined,"meter"),this.node("div",undefined,"supply"),this.node("div",undefined,"pipe"),this.node("div",undefined,"return"),this.node("small",t.rooms.find(r=>r.id===c.room_id)?.name||this.t("Neasociat","Unassigned")));diagram.append(loop);
+        }
+        row.append(diagram);
+        for(const c of circuits){
+          const f=this.setupForm(row,this.t("Aplică asocierea","Apply mapping"),()=>this.setupAction("map_circuit",{id:c.id,room_id:sel.value||null}));
+          const sel=this.setupField(f.form,this.t("Circuit ","Loop ")+c.position,"select",c.room_id||"",[["",this.t("Neasociat","Unassigned")],...roomOptions]);f.finish();
+          this.setupRemove(row,"circuits",c.id,this.t("Circuit ","Loop ")+c.position);
+        }
+        row.append(this.node("small",this.t("Schimbarea camerei păstrează istoricul vechi separat.","Changing a room keeps the old history separate."),"muted"));
+        const f=this.setupForm(row,this.t("Adaugă circuit","Add loop"),()=>this.setupAction("add_circuit",{manifold_id:m.id,position:Number(pos.value)}));
+        const pos=this.setupField(f.form,this.t("Poziție circuit nou","New loop position"),"number",Math.max(0,...circuits.map(c=>c.position))+1);pos.required=true;pos.min=1;pos.step=1;f.finish();
+        this.setupRemove(row,"manifolds",m.id,m.name);section.append(row);
+      }
+      if(t.floors.length){
+        const f=this.setupForm(section,this.t("Creează distribuitorul și circuitele","Create distributor and loops"),()=>this.setupAction("add_manifold",{name:name.value,floor_id:floor.value,count:Number(count.value),zone_id:zone?.value||null,zone_name:this.t("Încălzire principală","Main heating")}));
+        const name=this.setupField(f.form,this.t("Nume distribuitor nou","New distributor name"),"text");name.required=true;
+        const floor=this.setupField(f.form,this.t("Etaj","Floor"),"select",t.floors[0].id,floorOptions);
+        const count=this.setupField(f.form,this.t("Câte circuite are?","How many loops?"),"number",1);count.min=1;count.max=100;count.step=1;count.required=true;
+        let zone=null;
+        if(t.zones.length)zone=this.setupField(f.form,this.t("Sistem de încălzire","Heating system"),"select",t.zones[0].id,choices(t.zones));
+        else f.form.append(this.node("small",this.t("Se creează automat un sistem de încălzire principal.","A main heating system will be created automatically.")));
+        f.finish();
+      }else section.append(this.node("p",this.t("Adaugă mai întâi un etaj.","Add a floor first.")));
+    }
+    if(this.setupStep===4){
+      section.append(this.node("p",this.t("Ce echipament încălzește casa? Poți adăuga mai multe surse.","What equipment heats the home? You can add multiple sources.")));
+      const types=[["heat_pump",this.t("Pompă de căldură","Heat pump")],["gas",this.t("Centrală pe gaz","Gas boiler")],["electric",this.t("Electric","Electric")],["biomass",this.t("Lemne / peleți","Wood / pellets")],["district",this.t("Termoficare","District heating")],["hybrid",this.t("Hibrid","Hybrid")],["other",this.t("Altă sursă","Other source")],["unintegrated",this.t("Fără integrare","Not integrated")]];
+      for(const source of t.sources){
+        const row=this.node("div",undefined,"setup-item");row.append(this.node("strong","♨️ "+source.name+" · "+(types.find(x=>x[0]===source.source_type)?.[1]||source.source_type)));
+        const f=this.setupForm(row,this.t("Aplică numele","Apply name"),()=>this.setupAction("rename",{collection:"sources",id:source.id,name:name.value}));
+        const name=this.setupField(f.form,this.t("Nume sursă","Source name"),"text",source.name);name.required=true;f.finish();
+        this.setupRemove(row,"sources",source.id,source.name);section.append(row);
+      }
+      const f=this.setupForm(section,this.t("Adaugă sursă","Add source"),()=>this.setupAction("add_source",{name:name.value,source_type:kind.value,zone_ids:zones.filter(x=>x.checked).map(x=>x.value)}));
+      const name=this.setupField(f.form,this.t("Nume sursă nouă","New source name"),"text");name.required=true;
+      const kind=this.setupField(f.form,this.t("Tip echipament","Equipment type"),"select","heat_pump",types);
+      const zones=t.zones.map(z=>{const label=this.node("label",z.name);const input=this.node("input");input.type="checkbox";input.value=z.id;input.checked=t.zones.length===1;label.prepend(input);f.form.append(label);return input;});
+      f.finish();
+    }
+    if(this.setupStep===5){
+      section.append(this.node("p",this.t("Poți încheia configurarea chiar dacă nu ai toți senzorii sau circuitele. Analizele care au nevoie de date lipsă rămân indisponibile.","You can finish without every sensor or loop. Analyses that require missing data remain unavailable.")));
+      for(const [icon,label,done] of steps.slice(0,5))section.append(this.node("p",icon+" "+label+" — "+(done?this.t("Configurat","Configured"):this.t("De verificat","Review needed"))));
+      this.setupButton(section,this.t("Finalizează","Finish"),()=>{this.setup=null;this.setupError='';this.setupMessage='';this.refresh();});
+    }
+    box.append(section);
+    const foot=this.node("div",undefined,"setup-head");
+    if(this.setupStep>0)this.setupButton(foot,this.t("← Anterior","← Previous"),()=>{this.setupStep--;this.render();},true);
+    if(this.setupStep<5)this.setupButton(foot,this.t("Continuă →","Continue →"),()=>{this.setupStep++;this.render();});
+    box.append(foot);
+    const advanced=this.node("a",this.t("Setări avansate / Expert în Home Assistant","Advanced / Expert settings in Home Assistant"),"action");advanced.href="/config/integrations";box.append(advanced);
+  }
+
   render() {
     this.clearExportUrls();
     const root = this.shadowRoot;
@@ -749,6 +997,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       .label{overflow-wrap:anywhere}.room{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--divider-color)}
       .journal{margin:12px 0}.journal form{display:grid;gap:10px;padding:10px 0}.journal label{display:grid;gap:4px;overflow-wrap:anywhere}.journal input,.journal select,.journal textarea{width:100%;box-sizing:border-box;min-width:0;padding:8px;border:1px solid var(--divider-color);border-radius:6px;background:var(--card-background-color);color:var(--primary-text-color);font:inherit}.journal label[hidden]{display:none}.flow-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px}.journal-record{border-top:1px solid var(--divider-color);padding:8px 0}.journal-record small{display:block}.journal-record p{white-space:pre-wrap;overflow-wrap:anywhere}
       .journal label:has(input[type="checkbox"]){display:flex;align-items:flex-start;gap:8px}.journal input[type="checkbox"]{width:18px;height:18px;flex:0 0 18px;accent-color:var(--primary-color)}.journal summary{cursor:pointer;padding:8px 0;overflow-wrap:anywhere}select:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}.mode{flex-wrap:wrap}.room>div{min-width:0}.loop small{display:block;overflow-wrap:anywhere}
+      .setup{max-width:760px;margin:16px auto}.setup-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0}.setup-head h2{flex:1}.setup-nav{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:8px;margin:12px 0}.setup button{min-height:48px;white-space:normal;overflow-wrap:anywhere}.setup .secondary{background:var(--secondary-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color)}.setup-nav button[aria-current=step]{border:2px solid var(--primary-color);font-weight:bold}.setup-form{display:grid;gap:10px;margin:12px 0}.setup-form label{display:grid;gap:5px;font-size:1rem;overflow-wrap:anywhere}.setup-form input,.setup-form select{min-width:0;width:100%;box-sizing:border-box;min-height:46px;padding:8px;font:inherit;color:var(--primary-text-color);background:var(--card-background-color);border:1px solid var(--divider-color);border-radius:8px}.setup-form input[type=checkbox]{width:24px;min-height:24px}.setup-item{padding:14px 0;border-top:1px solid var(--divider-color);overflow-wrap:anywhere}.setup-item summary,.remove-confirm summary{cursor:pointer;padding:10px 0;min-height:24px}.remove-confirm{margin:8px 0}.setup-error:empty{display:none}.setup-diagram{max-width:100%}.setup .action{display:inline-block;margin-top:16px}
       @media(max-width:600px){main{padding:12px}.room{flex-wrap:wrap}.temperature{text-align:left}.journal button,.mode button{min-height:44px}}
     `;
     root.append(style);
@@ -760,10 +1009,17 @@ class IrpatEfficiencyPanel extends HTMLElement {
     refresh.addEventListener("click",()=>this.refresh());
     header.append(refresh);
     main.append(header);
+    if(this.setup){refresh.disabled=true;this.renderSetup(main);root.append(main);return;}
+    if(this.setupError)main.append(this.node("p",this.setupError,"status-warm"));
     main.append(this.node("p",this.t("Prezentare generală · versiune experimentală","Overview · experimental version"),"muted"));
-    const link = this.node("a",this.t("Configurează integrarea","Configure integration"),"action");
-    link.href = "/config/integrations";
-    main.append(link);
+    if(!this.entries.length){
+      const link=this.node("a",this.t("Adaugă integrarea","Add integration"),"action");link.href="/config/integrations";main.append(link);
+    }
+    for(const entry of this.entries){
+      const setup=this.node("button","⚙ "+this.t("Configurează casa","Set up home")+" · "+entry.name);
+      setup.disabled=this.busy||this.setupBusy||this.journalSaving;
+      setup.addEventListener("click",()=>this.openSetup(entry));main.append(setup);
+    }
     const modes = this.node("div",undefined,"mode");
     for (const [key,ro,en] of [["heating","Încălzire","Heating"],["cooling","Răcire","Cooling"]]) {
       const button=this.node("button",this.t(ro,en));

@@ -100,6 +100,9 @@ async def test_non_admin_cannot_read_or_modify(hass: HomeAssistant, hass_ws_clie
     assert not hass_admin_user.is_admin
     commands = [
         {"type": f"{DOMAIN}/overview"},
+        {"type": f"{DOMAIN}/configuration", "entry_id": entry.entry_id},
+        {"type": f"{DOMAIN}/configuration_action", "entry_id": entry.entry_id,
+         "revision":"invalid", "action":"add_floor", "payload":{"name":"Forbidden"}},
         {"type": f"{DOMAIN}/export_data", "entry_id": entry.entry_id, "format": "json"},
         {"type": f"{DOMAIN}/journal_append", "entry_id": entry.entry_id,
          "manifold_id": "unknown", "readings": {"unknown": 1}, "phase": "observation"},

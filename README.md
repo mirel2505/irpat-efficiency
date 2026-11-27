@@ -25,7 +25,7 @@ No external AI or telemetry service is required. No service calls to physical he
 
 ## Configurare / Planned first setup
 
-After a validated installation, add the integration from Settings → Devices & services. Create a named installation, then open Configure and add floors and hydraulic zones before rooms, sources, manifolds, circuits and bindings. Select sensors using the native entity selectors; thermostats supply current_temperature, not setpoints. Set heating and cooling targets separately. Confirmed configuration steps are saved and applied automatically; select Done to close the menu. Open the irPaT & Eficiență sidebar panel.
+After a validated installation, add the integration from Settings → Devices & services. Create a named installation, then open Configure and add floors and hydraulic zones before rooms, sources, manifolds, circuits and bindings. Select sensors using the native entity selectors; thermostats supply current_temperature, not setpoints. Set heating and cooling targets separately. Open the irPaT sidebar and select Set up home for graphical guided configuration, automatic temperature suggestions, room editing and loop mapping. Confirmed changes are applied automatically. Advanced settings remain in the native Configure menu. Open the irPaT & Eficiență sidebar panel.
 
 Select Expert to see profiles, reviewed climate and inertia forms, mode/defrost journals, building reports and export. Record physical flow readings manually. Leave unavailable values empty. Do not confirm measurement boundaries, continuous operation or comparable conditions without evidence.
 

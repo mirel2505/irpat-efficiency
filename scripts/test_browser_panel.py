@@ -49,6 +49,14 @@ MOCK = """({entry, language}) => {
       window.requests.push(request);
       switch(request.type) {
         case 'irpat_efficiency/overview': return [entry];
+        case 'irpat_efficiency/configuration':
+          entry.topology.bindings ||= [];
+          return {revision:'one',topology:entry.topology,native_floors:{},native_areas:{},
+                  entities:[],room_temperatures:entry.room_temperatures};
+        case 'irpat_efficiency/configuration_action':
+          if(request.action==='add_floor')entry.topology.floors.push({id:'newfloor',name:request.payload.name});
+          return {revision:'two',topology:entry.topology,native_floors:{},native_areas:{},
+                  entities:[],room_temperatures:entry.room_temperatures};
         case 'irpat_efficiency/journal_append':
           entry.journal.push({id:'new',manifold_id:request.manifold_id,
             timestamp:'2026-11-27T12:00:00Z',phase:request.phase,
@@ -118,12 +126,23 @@ def run_case(browser, language, width, dark):
     downloaded = event.value
     assert downloaded.suggested_filename == "irpat-export.json"
     assert json.loads(Path(downloaded.path()).read_text())["version"] == 1
+    panel.get_by_role("button", name=word("Configurează casa","Set up home"), exact=False).click()
+    expect(panel.locator(".setup")).to_be_visible()
+    panel.get_by_label(word("Nume etaj nou","New floor name")).fill("New floor")
+    panel.get_by_role("button", name=word("Adaugă etaj","Add floor"), exact=True).click()
+    expect(panel.get_by_text("✓ "+word("Modificare salvată","Change saved"), exact=True)).to_be_visible()
+    panel.get_by_role("button", name=word("Continuă →","Continue →"), exact=True).click()
+    expect(panel.locator(".setup").get_by_role("heading", name=word("🛏️ Camere","🛏️ Rooms"))).to_be_visible()
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 2"), "Setup horizontal overflow"
+    panel.get_by_role("button", name=word("Înapoi la dashboard","Back to dashboard"), exact=True).click()
+    expect(panel.get_by_role("heading", name="Test installation", exact=True)).to_be_visible()
     # The manifold itself may scroll horizontally, the document must not.
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 2"), "Page has horizontal overflow"
     assert not errors, errors
     assert set(page.evaluate("window.requests.map(r=>r.type)")) <= {
         "irpat_efficiency/overview", "irpat_efficiency/journal_append",
-        "irpat_efficiency/profile_review", "irpat_efficiency/export_data"}
+        "irpat_efficiency/profile_review", "irpat_efficiency/export_data",
+        "irpat_efficiency/configuration", "irpat_efficiency/configuration_action"}
     context.close()
     print(f"PASS: Chromium {language}, {width}px, {'dark' if dark else 'light'}; journal, expert, profile, download")
 

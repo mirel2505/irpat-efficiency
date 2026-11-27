@@ -1,5 +1,7 @@
 """Register the local, administrator-only overview panel."""
 from pathlib import Path
+import asyncio
+from copy import deepcopy
 import logging
 
 from homeassistant.components import frontend, panel_custom, websocket_api
@@ -9,7 +11,8 @@ from homeassistant.util import dt as dt_util
 import voluptuous as vol
 
 from .const import DOMAIN
-from .topology import empty_topology
+from .topology import empty_topology, TopologyError
+from .dashboard_config import snapshot, revision, apply_action
 from .temperature_reader import read_rooms
 from .telemetry_reader import read_telemetry
 from .live_diagnostics import live_diagnostics
@@ -24,6 +27,54 @@ _LOGGER = logging.getLogger(__name__)
 
 PANEL_PATH = "irpat-efficiency"
 ASSET_URL = "/irpat_efficiency_assets/panel.js"
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/configuration",
+    vol.Required("entry_id"): str,
+})
+@websocket_api.require_admin
+@callback
+def ws_configuration(hass, connection, msg):
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if not entry or entry.domain != DOMAIN:
+        connection.send_error(msg["id"], "invalid_reference", "Unknown irPaT installation")
+        return
+    connection.send_result(msg["id"], snapshot(hass, entry))
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/configuration_action",
+    vol.Required("entry_id"): str,
+    vol.Required("revision"): str,
+    vol.Required("action"): str,
+    vol.Required("payload"): dict,
+})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_configuration_action(hass, connection, msg):
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if not entry or entry.domain != DOMAIN:
+        connection.send_error(msg["id"], "invalid_reference", "Unknown irPaT installation")
+        return
+    locks = hass.data[DOMAIN].setdefault("draft_locks", {})
+    async with locks.setdefault(entry.entry_id, asyncio.Lock()):
+        if msg["revision"] != revision(entry):
+            connection.send_error(msg["id"], "configuration_changed", "Configuration changed; reopen setup")
+            return
+        try:
+            updated = apply_action(hass, entry.options.get("topology", empty_topology()),
+                                   msg["action"], msg["payload"])
+            if updated != entry.options.get("topology", empty_topology()):
+                # Monitors read entry.options on each sample; do not unload the
+                # sidebar or restart equipment on each confirmed graphical edit.
+                hass.config_entries.async_update_entry(
+                    entry, options={**entry.options, "topology": deepcopy(updated)})
+            connection.send_result(msg["id"], snapshot(hass, entry))
+        except TopologyError as exc:
+            connection.send_error(msg["id"], str(exc), str(exc))
+        except (KeyError, TypeError, ValueError):
+            connection.send_error(msg["id"], "invalid_reference", "Invalid configuration fields")
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/overview"})
@@ -368,6 +419,8 @@ async def async_register(hass):
         ])
         runtime["static_registered"] = True
     if not runtime.get("api_registered"):
+        websocket_api.async_register_command(hass, ws_configuration)
+        websocket_api.async_register_command(hass, ws_configuration_action)
         websocket_api.async_register_command(hass, ws_overview)
         websocket_api.async_register_command(hass, ws_journal_append)
         websocket_api.async_register_command(hass, ws_profile_create)
