@@ -7,6 +7,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .energy_store import EnergyStore
+from .fuel_monitor import FuelMonitor
 from .mode_history import observation
 from .paired_energy import pair_signature
 from .source_settings import estimate_cost
@@ -21,6 +22,8 @@ class EnergyMonitor:
         self.hass = hass
         self.entry = entry
         self.history = EnergyStore(Store(hass, 1, f"{DOMAIN}.energy.{entry.entry_id}"))
+        self.fuel = FuelMonitor(hass, entry)
+        self.fuel_save_failed = False
         self.cancel = None
         self.save_failed = False
 
@@ -34,6 +37,7 @@ class EnergyMonitor:
 
     async def async_start(self):
         await self.history.async_load()
+        await self.fuel.history.async_load()
         self.cancel = async_track_utc_time_change(
             self.hass, self.async_sample, minute=range(0, 60, 5), second=0)
 
@@ -67,6 +71,13 @@ class EnergyMonitor:
         except Exception:
             self.save_failed = True
             _LOGGER.exception("Could not persist energy history")
+        try:
+            stamp = dt_util.utcnow().timestamp()
+            await self.fuel.history.async_sample(self.fuel.samples(topology, stamp), stamp, tz)
+            self.fuel_save_failed = False
+        except Exception:
+            self.fuel_save_failed = True
+            _LOGGER.exception("Could not persist fuel history")
 
     def overview(self, topology, telemetry):
         tz = dt_util.get_time_zone(self.hass.config.time_zone)
@@ -87,3 +98,4 @@ class EnergyMonitor:
             self.cancel()
             self.cancel = None
         await self.history.async_close()
+        await self.fuel.history.async_close()
