@@ -9,7 +9,7 @@ Local, advisory-only Home Assistant integration for hydronic radiant floor heati
 ## Stadiu / Status
 
 **0.1.0.dev0 — experimental foundation, not ready for installation on a production system.**
-Initial configuration entry, topology model, native options forms for adding floors, zones, rooms, manifolds, circuits, sources and ambient temperature bindings, and calculation primitives are implemented in source. Native forms are not yet validated on Home Assistant. The dedicated graphical panel, complete configuration editing, data collection, historical data, balancing assistant and reports are not yet implemented. Marketplace metadata (hacs.json) is present; installation has not been validated. No release is available.
+Initial configuration entry, topology model, native options forms for adding floors, zones, rooms, manifolds, circuits, sources and ambient temperature bindings, and calculation primitives are implemented in source. Native forms are not yet validated on Home Assistant. An experimental administrator-only sidebar overview is implemented in source, displaying the saved topology, heating targets and graphical manifolds in physical circuit order. It uses a local dependency-free JavaScript custom element as a bootstrap; the planned TypeScript/Lit editor, interactive flow entry, complete configuration editing, live sensor readings, historical data, balancing assistant and reports are not yet implemented. Panel registration and rendering still require a real Home Assistant smoke test. Marketplace metadata (hacs.json) is present; installation has not been validated. No release is available.
 
 ## Principii / Principles
 
@@ -48,7 +48,7 @@ Run the initial pure-Python calculation and topology unit tests from the reposit
 python -m unittest discover -s tests -v
 ```
 
-Home Assistant integration tests, frontend and Marketplace packaging validation remain pending.
+Home Assistant integration tests, browser rendering tests and Marketplace packaging validation remain pending.
 
 ## Support / Susținere
 
