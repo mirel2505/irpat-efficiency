@@ -62,7 +62,8 @@
           "manifold": "Add manifold",
           "circuit": "Add circuit",
           "binding": "Add room sensor",
-          "save": "Save configuration"
+          "save": "Save configuration",
+          "outdoor": "Configure outdoor sensor"
         }
       },
       "floor": {
@@ -121,6 +122,13 @@
           "name": "Custom name",
           "room_id": "Room",
           "entity_id": "Sensor or thermostat"
+        }
+      },
+      "outdoor": {
+        "title": "Outdoor temperature",
+        "description": "Select the outdoor sensor. Leave blank to remove the association, then save the configuration.",
+        "data": {
+          "entity_id": "Outdoor sensor"
         }
       }
     },
