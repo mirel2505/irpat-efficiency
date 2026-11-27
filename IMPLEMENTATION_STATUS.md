@@ -2,7 +2,7 @@
 
 2026-11-27. This document describes the implemented development build, not a certified installation or a complete implementation of SPECIFICATION.md. The earlier percentages in ROADMAP.md are subjective estimates for the initial usable build, not measured percentages of the full specification or test completion.
 
-## Scope of the initial beta candidate
+## Scope of Beta 1
 
 | Area | Implemented in source | Not yet delivered or verified |
 | --- | --- | --- |
@@ -16,7 +16,7 @@
 | Cooling | Dew point, surface and water proxy review, separate targets/profiles | Configurable margin and optional notifications; hardware safety remains external |
 | UX | Native bilingual forms, simple/expert panel, HA theme, manual manifold readings, responsive CSS | Visual floor plan, demo mode, complete accessibility and end-to-end HA browser verification (isolated Chromium tests passed) |
 | Data | Local HA Store, analysis CSV/JSON, native backup preparation | Full HAOS restore/restart validation (native Core archive recovery passed), per-integration import, migration fixtures and redacted diagnostic export |
-| Packaging | Manifest, hacs.json, workflows, README, GPLv3 | Owner beta approval, real installation validation and catalog submission |
+| Packaging | Manifest, hacs.json, workflows, README, GPLv3 | Real installation validation and catalog submission |
 
 The beta scope is intentionally advisory-only. No automatic equipment control, no remote telemetry, no paywalled features. The above gaps are retained in the full specification; they are not silently declared complete.
 

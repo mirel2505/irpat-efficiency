@@ -100,7 +100,7 @@ def run_case(browser, language, width, dark):
     panel = page.locator("irpat-efficiency-panel")
     expect(panel.get_by_role("heading", name="Test installation", exact=True)).to_be_visible()
     expect(panel.get_by_text("21.5 °C", exact=True)).to_be_visible()
-    expect(panel.get_by_text("dev7", exact=True)).to_be_visible()
+    expect(panel.get_by_text("beta.1", exact=True)).to_be_visible()
     expect(panel.locator(".room-tile")).to_have_attribute("data-status", "cold")
     assert panel.locator(".room-tile").bounding_box()["height"] <= 88, "Closed room tile too tall"
     assert panel.locator(".comfort-grid").evaluate("(e) => getComputedStyle(e).gridTemplateColumns.split(\' \').length") == 3

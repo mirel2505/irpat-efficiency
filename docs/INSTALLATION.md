@@ -8,7 +8,7 @@ Local, advisory-only Home Assistant integration for hydronic radiant floor heati
 
 ## Stadiu / Status
 
-**Development beta — no stable release.** The tested baseline passed isolated Core, Chromium and archive recovery checks. Installation on the owner's Home Assistant requires explicit approval. See [implementation scope and release gates](../IMPLEMENTATION_STATUS.md) for the distinction between implemented functionality and the full product specification.
+**Beta 1 — no stable release.** The tested baseline passed isolated Core, Chromium and archive recovery checks. Installation on the owner's Home Assistant requires explicit approval. See [implementation scope and release gates](../IMPLEMENTATION_STATUS.md) for the distinction between implemented functionality and the full product specification.
 
 ## Funcționalități / Implemented in source
 
@@ -41,7 +41,7 @@ Use **Settings → System → Backups** and include Home Assistant settings. Kee
 
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mirel2505&repository=irpat-efficiency&category=integration)
 
-**HACS:** Open the button above, add the custom repository as an Integration and choose Download. If needed, use HACS → three-dot menu → Custom repositories and add `https://github.com/mirel2505/irpat-efficiency`, category Integration. Select the default branch if no release is offered. See [HACS custom repositories](https://hacs.dev/docs/faq/custom_repositories/).
+**HACS:** Open the button above, add the custom repository as an Integration and choose Download. If needed, use HACS → three-dot menu → Custom repositories and add `https://github.com/mirel2505/irpat-efficiency`, category Integration. Select the pre-release `0.1.0-beta.1` (enable beta versions if needed). See [HACS custom repositories](https://hacs.dev/docs/faq/custom_repositories/).
 
 **Home Assistant Marketplace (2026.11 onwards):** Settings → Marketplace → Add from link → enter the same repository URL, select Integration if prompted. See [official Marketplace documentation](https://www.home-assistant.io/integrations/marketplace/#custom-repositories). A downloadable version must be available; actual Marketplace installation remains unverified.
 

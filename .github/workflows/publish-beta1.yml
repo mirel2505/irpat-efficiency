@@ -1,0 +1,62 @@
+name: Publish THERMELYVO Beta 1
+on:
+  workflow_run:
+    workflows: ["Calculation tests", "Home Assistant Core compatibility", "Browser panel validation"]
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: thermelyvo-beta1-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify exact candidate and all three workflows
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CANDIDATE: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)" != "$CANDIDATE" ]]; then
+            echo "Candidate is no longer main; skip."
+            exit 0
+          fi
+          version=$(gh api "repos/$GH_REPO/contents/custom_components/irpat_efficiency/manifest.json?ref=$CANDIDATE" --jq .content | base64 -d | jq -r .version)
+          if [[ "$version" != "0.1.0-beta.1" ]]; then
+            echo "Not the one-time Beta 1 candidate."
+            exit 0
+          fi
+          for workflow in tests.yml ha-compatibility.yml browser.yml; do
+            conclusion=$(gh api "repos/$GH_REPO/actions/workflows/$workflow/runs?head_sha=$CANDIDATE&event=push&per_page=10" --jq '.workflow_runs[0].conclusion // "pending"')
+            if [[ "$conclusion" != "success" ]]; then
+              echo "$workflow: $conclusion; publication not authorized by CI yet."
+              exit 0
+            fi
+          done
+          if gh release view "$version" --repo "$GH_REPO" >/dev/null 2>&1; then
+            echo "Release already exists."
+            exit 0
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+      - name: Publish pre-release for verified commit
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CANDIDATE: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)" != "$CANDIDATE" ]]; then
+            echo "Main changed; skip."
+            exit 0
+          fi
+          gh api "repos/$GH_REPO/contents/CHANGELOG.md?ref=$CANDIDATE" --jq .content | base64 -d > release-notes.md
+          gh release create 0.1.0-beta.1 --repo "$GH_REPO" --target "$CANDIDATE" --title "THERMELYVO 0.1.0 — Beta 1" --prerelease --latest=false --notes-file release-notes.md

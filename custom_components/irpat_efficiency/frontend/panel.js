@@ -1428,7 +1428,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
     root.append(style);
     const main = this.node("main");
     const header = this.node("header");
-    const brand=this.node("div",undefined,"brand");brand.append(this.icon("home"),this.node("h1","THERMELYVO"),this.node("small","dev7","version-label"));header.append(brand);
+    const brand=this.node("div",undefined,"brand");brand.append(this.icon("home"),this.node("h1","THERMELYVO"),this.node("small","beta.1","version-label"));header.append(brand);
     const refresh = this.node("button",this.t("Actualizează","Refresh"));
     refresh.disabled = this.busy || this.journalSaving;
     refresh.addEventListener("click",()=>this.refresh());

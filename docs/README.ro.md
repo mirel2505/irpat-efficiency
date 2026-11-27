@@ -37,11 +37,11 @@ Meteoreglare, echilibrare hidraulică și echilibrare termică. Preferăm instal
 
 Integrarea oferă recomandări consultative, nu comandă echipamentele și nu garantează economii. Este necesară protecție independentă împotriva condensului în răcire.
 
-## Instalare beta
+## Instalare Beta 1
 
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mirel2505&repository=irpat-efficiency&category=integration)
 
-Adaugă repository-ul ca integrare personalizată în HACS, descarcă versiunea disponibilă, repornește Home Assistant dacă este necesar și caută **THERMELYVO** în Devices & services. Deschide panoul din meniul lateral pentru configurare.
+Adaugă repository-ul ca integrare personalizată în HACS, selectează versiunea pre-release `0.1.0-beta.1` (activează afișarea versiunilor beta dacă este necesar), repornește Home Assistant dacă este necesar și caută **THERMELYVO** în Devices & services. Deschide panoul din meniul lateral pentru configurare.
 
 Fă un backup înainte de actualizare. Domeniul tehnic vechi este păstrat pentru compatibilitate. Proiectul este în dezvoltare, fără versiune stabilă.
 

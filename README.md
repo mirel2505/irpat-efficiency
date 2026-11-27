@@ -10,7 +10,7 @@
 
 Local, read-only thermal and energy analytics for Home Assistant.
 
-[![Development beta](https://img.shields.io/badge/status-development%20beta-8b5cf6?style=flat-square)](IMPLEMENTATION_STATUS.md)
+[![Public beta 1](https://img.shields.io/badge/THERMELYVO-0.1.0--beta.1-8b5cf6?style=flat-square)](https://github.com/mirel2505/irpat-efficiency/releases)
 [![Calculation tests](https://github.com/mirel2505/irpat-efficiency/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/mirel2505/irpat-efficiency/actions/workflows/tests.yml)
 [![Browser validation](https://github.com/mirel2505/irpat-efficiency/actions/workflows/browser.yml/badge.svg?branch=main)](https://github.com/mirel2505/irpat-efficiency/actions/workflows/browser.yml)
 [![GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-2563eb?style=flat-square)](LICENSE)
@@ -75,11 +75,11 @@ The bilingual panel includes a compact comfort dashboard, guided configuration, 
 
 ## Installation
 
-> **Development beta — not a stable release.** Install on a test system first and make a current Home Assistant backup.
+> **Beta 1 — not a stable release.** Install on a test system first and make a current Home Assistant backup.
 
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mirel2505&repository=irpat-efficiency&category=integration)
 
-1. Add this repository as a custom **Integration** in HACS and download the available development version.
+1. Add this repository as a custom **Integration** in HACS and select `0.1.0-beta.1` from the available pre-release versions (enable beta versions if needed).
 2. Restart Home Assistant if required.
 3. Go to **Settings → Devices & services → Add integration**, search for **THERMELYVO**, and add it.
 4. Open **THERMELYVO** in the sidebar and select **Set up home** to configure your rooms, circuits, heat sources and sensors.
@@ -92,7 +92,7 @@ The configuration shortcut is not an installer. [Detailed installation, upgrade 
 
 ## Project status
 
-Active development. Heating recommendations require adequate aligned history, comparable operating conditions and review by the user. The project does not certify hydraulic balance or guarantee savings. Cooling curve optimization is not currently supported.
+Active development. [Release notes](CHANGELOG.md) · [Releases](https://github.com/mirel2505/irpat-efficiency/releases). Heating recommendations require adequate aligned history, comparable operating conditions and review by the user. The project does not certify hydraulic balance or guarantee savings. Cooling curve optimization is not currently supported.
 
 [Implementation status](IMPLEMENTATION_STATUS.md) · [Algorithms](ALGORITHMS.md) · [Architecture](ARCHITECTURE.md) · [Roadmap](ROADMAP.md) · [Test runs](https://github.com/mirel2505/irpat-efficiency/actions)
 
