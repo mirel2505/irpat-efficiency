@@ -1,0 +1,40 @@
+{
+  "title": "irPaT & Eficiență",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure your home",
+        "description": "Create a local configuration. No commands will be sent to equipment.",
+        "data": {
+          "name": "Home name",
+          "operating_mode": "Operating mode",
+          "circuit_control": "Circuit control"
+        }
+      }
+    },
+    "error": {
+      "invalid_name": "Enter a valid name."
+    },
+    "abort": {
+      "already_configured": "The integration is already configured."
+    }
+  },
+  "selector": {
+    "operating_mode": {
+      "options": {
+        "weather": "Weather compensation (continuous operation)",
+        "fixed": "Fixed supply temperature (continuous operation)",
+        "onoff": "ON/OFF room thermostat",
+        "unknown": "Unknown"
+      }
+    },
+    "circuit_control": {
+      "options": {
+        "manual": "Manual balancing",
+        "open": "Actuators held open",
+        "automatic": "Automatically controlled actuators",
+        "unknown": "Unknown"
+      }
+    }
+  }
+}
