@@ -52,11 +52,11 @@ MOCK = """({entry, language}) => {
         case 'irpat_efficiency/configuration':
           entry.topology.bindings ||= [];
           return {revision:'one',topology:entry.topology,native_floors:{},native_areas:{},
-                  entities:[],room_temperatures:entry.room_temperatures};
+                  entities:[{entity_id:"sensor.test_outdoor",name:"Outside sensor",temperature_c:5},{entity_id:"sensor.test_other",name:"Other sensor",temperature_c:7}],room_temperatures:entry.room_temperatures};
         case 'irpat_efficiency/configuration_action':
           if(request.action==='add_floor')entry.topology.floors.push({id:'newfloor',name:request.payload.name});
           return {revision:'two',topology:entry.topology,native_floors:{},native_areas:{},
-                  entities:[],room_temperatures:entry.room_temperatures};
+                  entities:[{entity_id:"sensor.test_outdoor",name:"Outside sensor",temperature_c:5},{entity_id:"sensor.test_other",name:"Other sensor",temperature_c:7}],room_temperatures:entry.room_temperatures};
         case 'irpat_efficiency/journal_append':
           entry.journal.push({id:'new',manifold_id:request.manifold_id,
             timestamp:'2026-11-27T12:00:00Z',phase:request.phase,
@@ -98,7 +98,7 @@ def run_case(browser, language, width, dark):
     panel = page.locator("irpat-efficiency-panel")
     expect(panel.get_by_role("heading", name="Test installation", exact=True)).to_be_visible()
     expect(panel.get_by_text("21.5 °C", exact=True)).to_be_visible()
-    expect(panel.get_by_text("dev3", exact=True)).to_be_visible()
+    expect(panel.get_by_text("dev4", exact=True)).to_be_visible()
     expect(panel.locator(".room-tile")).to_have_attribute("data-status", "cold")
     assert panel.locator(".room-tile").bounding_box()["height"] <= 88, "Closed room tile too tall"
     assert panel.locator(".comfort-grid").evaluate("(e) => getComputedStyle(e).gridTemplateColumns.split(\' \').length") == 3
@@ -144,6 +144,21 @@ def run_case(browser, language, width, dark):
     expect(panel.get_by_text("✓ "+word("Modificare salvată","Change saved"), exact=True)).to_be_visible()
     panel.get_by_role("button", name=word("Continuă →","Continue →"), exact=True).click()
     expect(panel.locator(".setup").get_by_role("heading", name=word("Camere","Rooms"), exact=True)).to_be_visible()
+    panel.locator(".setup-nav button").nth(2).click()
+    label = word("Temperatură exterioară (opțional)", "Outdoor temperature (optional)")
+    picker = panel.locator(".entity-picker").filter(has=panel.get_by_role("button", name=word("Caută ID: ", "Search ID: ")+label, exact=True))
+    picker.get_by_role("button").click()
+    search = picker.get_by_role("searchbox")
+    search.fill("TEST_OTHER")
+    select = picker.locator("select")
+    assert select.locator("option[value=\'sensor.test_other\']").count() == 1
+    expect(select).to_have_value("sensor.test_outdoor")
+    search.fill("does_not_exist")
+    expect(picker.get_by_text(word("Niciun rezultat compatibil", "No compatible matches"), exact=True)).to_be_visible()
+    expect(select).to_have_value("sensor.test_outdoor")
+    search.fill("Other sensor")
+    select.select_option("sensor.test_other")
+    expect(select).to_have_value("sensor.test_other")
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 2"), "Setup horizontal overflow"
     panel.get_by_role("button", name=word("Înapoi la dashboard","Back to dashboard"), exact=True).click()
     expect(panel.get_by_role("heading", name="Test installation", exact=True)).to_be_visible()
