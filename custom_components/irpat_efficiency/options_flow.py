@@ -26,7 +26,7 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
         if not hasattr(self, "_topology"):
             self._topology = deepcopy(self.config_entry.options.get("topology", empty_topology()))
         t = self._topology
-        menu = ["floor", "zone"]
+        menu = ["floor", "zone", "outdoor"]
         if t["floors"]:
             menu.append("room")
         if t["zones"]:
@@ -117,6 +117,24 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
             vol.Required("entity_id"): selector.EntitySelector(selector.EntitySelectorConfig(
                 filter=[{"domain": "sensor", "device_class": "temperature"}, {"domain": "climate"}])),
         }, user_input)
+
+    async def async_step_outdoor(self, user_input=None):
+        """Select or remove the optional outdoor temperature sensor."""
+        errors = {}
+        if user_input is not None:
+            entity = user_input.get("entity_id")
+            if entity and (not isinstance(entity, str) or not entity.startswith("sensor.")):
+                errors["base"] = "invalid_entity"
+            else:
+                if entity:
+                    self._topology["outdoor_entity_id"] = entity
+                else:
+                    self._topology.pop("outdoor_entity_id", None)
+                return await self.async_step_init()
+        return self.async_show_form(step_id="outdoor", data_schema=vol.Schema({
+            vol.Optional("entity_id"): selector.EntitySelector(selector.EntitySelectorConfig(
+                filter=[{"domain": "sensor", "device_class": "temperature"}])),
+        }), errors=errors)
 
     async def async_step_save(self, user_input=None):
         return self.async_create_entry(title="", data={
