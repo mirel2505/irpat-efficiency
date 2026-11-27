@@ -160,7 +160,8 @@
           "manage_menu": "5. Editează sau șterge",
           "all_actions": "Expert – toate opțiunile",
           "overview_menu": "Înapoi la configurare",
-          "room_setup": "Completează încăpere existentă (senzori și circuite)"
+          "room_setup": "Completează încăpere existentă (senzori și circuite)",
+          "beta_reset": "Resetează întreaga configurație (Beta)"
         }
       },
       "floor": {
@@ -498,7 +499,8 @@
           "remove": "Șterge unul sau mai multe elemente",
           "discard_draft": "Renunță la ciornă (păstrează configurația salvată)",
           "overview_menu": "Înapoi la configurare",
-          "save": "Salvează configurația"
+          "save": "Salvează configurația",
+          "beta_reset": "Resetează întreaga configurație (Beta)"
         }
       },
       "all_actions": {
@@ -527,7 +529,8 @@
           "economic_source": "Combustibil și scenarii economice",
           "hybrid_zone": "Strategie sistem hibrid",
           "overview_menu": "Înapoi la configurare",
-          "room_setup": "Completează încăpere existentă (senzori și circuite)"
+          "room_setup": "Completează încăpere existentă (senzori și circuite)",
+          "beta_reset": "Resetează întreaga configurație (Beta)"
         }
       },
       "overview_menu": {
@@ -559,6 +562,15 @@
           "cancel": "Anulează și revino la meniu",
           "detach_zone_sources": "Desprinde zonele selectate de sursele păstrate"
         }
+      },
+      "beta_reset": {
+        "title": "Resetează întreaga configurație (Beta)",
+        "description": "Această operațiune aplică imediat o sesiune irPaT nouă: toate nivelurile, încăperile, zonele, distribuitoarele, circuitele, sursele, asocierile senzorilor, tarifele și ciorna activă sunt golite. Istoricul afișat pornește de la zero. Fișierele vechi rămân izolate pe disc și sunt incluse în backupurile native; nu este ștergere fizică și nu există anulare din interfață. Zonele, dispozitivele, entitățile, automatizările și celelalte integrări Home Assistant nu sunt modificate. Fă un backup înainte. Scrie RESET și confirmă. Integrarea se reîncarcă, fără repornirea intenționată a Core.",
+        "data": {
+          "confirmation": "Scrie RESET",
+          "confirmed": "Confirm resetarea întregii configurații irPaT",
+          "cancel": "Anulează și revino la meniu"
+        }
       }
     },
     "error": {
@@ -587,7 +599,8 @@
       "invalid_fuel_unit": "Alege o unitate acceptată.",
       "invalid_fuel_factor": "Introdu un factor energetic verificat și coerent pentru unitate.",
       "invalid_fuel_basis": "Alege baza energetică validă pentru combustibil.",
-      "invalid_fuel_efficiency": "Verifică randamentul și baza PCS/PCI."
+      "invalid_fuel_efficiency": "Verifică randamentul și baza PCS/PCI.",
+      "beta_reset_confirmation": "Scrie RESET și activează confirmarea pentru a continua."
     },
     "abort": {
       "draft_conflict": "Configurația sau ciorna s-a schimbat în altă sesiune. Redeschide Configure pentru ultima ciornă.",
