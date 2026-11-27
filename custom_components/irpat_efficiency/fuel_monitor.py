@@ -3,6 +3,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
+from .storage_identity import storage_key
 from .energy_store import EnergyStore
 from .fuel_economics import UNIT_ALIASES, finite, fuel_cost
 
@@ -10,7 +11,7 @@ from .fuel_economics import UNIT_ALIASES, finite, fuel_cost
 class FuelMonitor:
     def __init__(self, hass, entry):
         self.hass = hass
-        self.history = EnergyStore(Store(hass, 1, f"{DOMAIN}.fuel.{entry.entry_id}", atomic_writes=True))
+        self.history = EnergyStore(Store(hass, 1, storage_key(entry, "fuel"), atomic_writes=True))
 
     def samples(self, topology, now):
         """A selected counter must be cumulative and have the declared unit."""
