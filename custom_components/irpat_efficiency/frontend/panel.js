@@ -967,6 +967,51 @@ class IrpatEfficiencyPanel extends HTMLElement {
     wrap.append(field);form.append(wrap);return field;
   }
 
+  // Search is local, scoped to compatible entities; only the select is saved.
+  entityField(form,label,value="",options=[]) {
+    const group=this.node("div",undefined,"entity-picker");
+    const top=this.node("div",undefined,"entity-picker-head");
+    const caption=this.node("span",label);
+    const field=this.node("select");
+    const toggle=this.node("button",undefined,"entity-search-toggle secondary");
+    toggle.type="button";toggle.setAttribute("aria-expanded","false");
+    const glass=document.createElementNS("http://www.w3.org/2000/svg","svg");
+    glass.setAttribute("viewBox","0 0 24 24");glass.setAttribute("width","16");glass.setAttribute("height","16");glass.setAttribute("fill","none");glass.setAttribute("stroke","currentColor");glass.setAttribute("stroke-width","2");glass.setAttribute("aria-hidden","true");
+    const path=document.createElementNS("http://www.w3.org/2000/svg","path");path.setAttribute("d","M21 21l-6-6M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z");glass.append(path);
+    toggle.append(glass,this.node("span",this.t("Caută ID","Search ID")));
+    toggle.setAttribute("aria-label",this.t("Caută ID: ","Search ID: ")+label);
+    field.setAttribute("aria-label",label);
+    top.append(caption,toggle);group.append(top);
+    const searchBox=this.node("div",undefined,"entity-search-box");searchBox.hidden=true;
+    const search=this.node("input");search.type="search";search.placeholder=this.t("ID sau nume senzor…","Entity ID or name…");search.autocomplete="off";search.spellcheck=false;search.setAttribute("aria-label",this.t("Filtrează: ","Filter: ")+label);
+    const count=this.node("small",undefined,"muted");count.setAttribute("aria-live","polite");
+    searchBox.append(search,count);group.append(searchBox,field);form.append(group);
+    const all=new Map(options.map(([id,name])=>[id,name]));
+    if(value&&!all.has(value))all.set(value,value);
+    const normalize=v=>String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+    const refill=(selected)=>{
+      const terms=normalize(search.value).trim().split(/\s+/).filter(Boolean);
+      const matches=[...all].filter(([id,name])=>id&&terms.every(term=>normalize(id+" "+name).includes(term)));
+      field.replaceChildren();
+      for(const [id,name] of all){
+        if(!id||id===selected||matches.some(([mid])=>mid===id)){
+          const o=this.node("option",name);o.value=id;field.append(o);
+        }
+      }
+      field.value=selected;
+      count.textContent=matches.length?matches.length+" "+this.t("rezultate","matches"):this.t("Niciun rezultat compatibil","No compatible matches");
+    };
+    refill(value??"");
+    toggle.addEventListener("click",()=>{
+      searchBox.hidden=!searchBox.hidden;toggle.setAttribute("aria-expanded",String(!searchBox.hidden));
+      if(searchBox.hidden){search.value="";refill(field.value);}else search.focus();
+    });
+    search.addEventListener("input",()=>refill(field.value));
+    search.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();field.focus();}else if(e.key==="Escape"){e.preventDefault();search.value="";refill(field.value);searchBox.hidden=true;toggle.setAttribute("aria-expanded","false");toggle.focus();}});
+    field.addEventListener("change",()=>{if(search.value){search.value="";refill(field.value);}});
+    return field;
+  }
+
   setupForm(parent,caption,action) {
     const form=this.node("form",undefined,"setup-form");
     const button=this.node("button",caption);button.type="submit";
@@ -1108,11 +1153,11 @@ class IrpatEfficiencyPanel extends HTMLElement {
           this.setupRemove(row,"bindings",binding.id,binding.name);
         }
         const f=this.setupForm(row,this.t("Asociază senzor","Link sensor"),()=>this.setupAction("bind",{room_id:room.id,entity_id:sel.value}));
-        const sel=this.setupField(f.form,this.t("Senzor temperatură","Temperature sensor"),"select","",[["",blank],...sensorOptions(room.id)]);sel.required=true;f.finish();section.append(row);
+        const sel=this.entityField(f.form,this.t("Senzor temperatură","Temperature sensor"),"",[["",blank],...sensorOptions(room.id)]);sel.required=true;f.finish();section.append(row);
       }
       const f=this.setupForm(section,this.t("Aplică senzorul exterior","Apply outdoor sensor"),()=>this.setupAction("outdoor",{entity_id:out.value||null}));
       const existing=d.entities.find(e=>e.entity_id===t.outdoor_entity_id);
-      const out=this.setupField(f.form,this.t("Temperatură exterioară (opțional)","Outdoor temperature (optional)"),"select",t.outdoor_entity_id||"",[["",this.t("Niciunul","None")],...(t.outdoor_entity_id?[[t.outdoor_entity_id,existing?.name||t.outdoor_entity_id]]:[]),...sensorOptions(null,true)]);f.finish();
+      const out=this.entityField(f.form,this.t("Temperatură exterioară (opțional)","Outdoor temperature (optional)"),t.outdoor_entity_id||"",[["",this.t("Niciunul","None")],...(t.outdoor_entity_id?[[t.outdoor_entity_id,existing?.name||t.outdoor_entity_id]]:[]),...sensorOptions(null,true)]);f.finish();
     }
     if(this.setupStep===3){
       section.append(this.node("p",this.t("Distribuitorul este piesa din care pleacă țevile către camere. Alege camera pentru fiecare circuit; nu ghicim traseele.","The distributor is where the floor pipes branch to rooms. Choose the room for each loop; pipe routes are never guessed.")));
@@ -1179,7 +1224,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
           if(!current&&((isPump&&role==="burner")||(!isPump&&["compressor","defrost"].includes(role))))continue;
           const options=[["",this.t("Neasociat","Not linked")],...optionsFor(role)];
           if(current&&!options.some(x=>x[0]===current))options.push([current,current+" · "+this.t("Verifică entitatea","Review entity")]);
-          fields[role]=this.setupField(sf.form,this.t(ro,en),"select",current,options);
+          fields[role]=this.entityField(sf.form,this.t(ro,en),current,options);
           const reading=readings.find(x=>x.role===role);
           if(current)sf.form.append(this.node("small",reading?.status==="reported"?String(reading.value)+(reading.unit?" "+reading.unit:""):this.t("Citire indisponibilă sau invalidă","Unavailable or invalid reading"),"muted"));
         }
@@ -1200,7 +1245,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
         const mof=this.setupForm(modes,this.t("Salvează regimurile","Save operating modes"),()=>this.setupAction("source_mode",{id:source.id,entity_id:modeSensor.value||null,states:Object.fromEntries(Object.entries(modeFields).map(([k,v])=>[k,v.value]))}));
         const modeOptions=[["",this.t("Neasociat","Not linked")],...entities.filter(e=>e.entity_id.startsWith("sensor.")).sort((a,b)=>score(b)-score(a)||a.name.localeCompare(b.name)).map(e=>[e.entity_id,e.name+" · "+(e.state??"—")])];
         if(existing.entity_id&&!modeOptions.some(x=>x[0]===existing.entity_id))modeOptions.push([existing.entity_id,existing.entity_id]);
-        const modeSensor=this.setupField(mof.form,this.t("Senzor regim","Mode sensor"),"select",existing.entity_id||"",modeOptions);
+        const modeSensor=this.entityField(mof.form,this.t("Senzor regim","Mode sensor"),existing.entity_id||"",modeOptions);
         for(const [k,ro,en] of [["heating","Încălzire","Heating"],["cooling","Răcire","Cooling"],["dhw","ACM","Domestic hot water"],["standby","Așteptare","Standby"],["defrost","Degivrare","Defrost"],["off","Oprit","Off"]]){
           modeFields[k]=this.setupField(mof.form,this.t(ro,en),"text",Object.keys(existing.mapping||{}).find(raw=>existing.mapping[raw]===k)||"");
         }
@@ -1346,11 +1391,12 @@ class IrpatEfficiencyPanel extends HTMLElement {
       .setup .setup-form{gap:5px;margin:5px 0}.setup .inline-form{grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:5px}.setup .inline-form button{max-width:124px}.setup .remove-confirm{margin:3px 0}.setup .remove-confirm summary{font-size:.78rem}.setup [role=status]:empty{display:none}
       @media(min-width:720px){.setup-nav{grid-template-columns:repeat(6,minmax(0,1fr))}.dashboard-controls{grid-template-columns:auto minmax(0,1fr);align-items:center}.dashboard-toggles{justify-self:end;width:min(100%,440px)}.room-grid{grid-template-columns:repeat(auto-fit,minmax(275px,1fr))}}
       @media(max-width:340px){.brand h1{font-size:.92rem}.brand .line-icon{display:none}.dashboard-toggles .mode button{font-size:.71rem}.comfort-metric strong{font-size:1.18rem}.room-tile .room{grid-template-columns:minmax(0,1fr) auto}.room-tile .room>.line-icon{display:none}}
+      .entity-picker{display:grid;gap:4px;min-width:0}.entity-picker-head{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:.9rem}.entity-picker-head>span{min-width:0;overflow-wrap:anywhere}.setup .entity-search-toggle{display:inline-flex;align-items:center;gap:4px;padding:4px 7px;min-height:36px;font-size:.76rem;white-space:nowrap;color:var(--primary-text-color);background:color-mix(in srgb,var(--ir-violet) 14%,var(--card-background-color));border:1px solid color-mix(in srgb,var(--ir-violet) 40%,transparent)}.entity-search-box{display:grid;gap:3px}.entity-search-box[hidden]{display:none}.entity-search-box small{font-size:.72rem}.entity-picker select{max-width:100%}
     `;
     root.append(style);
     const main = this.node("main");
     const header = this.node("header");
-    const brand=this.node("div",undefined,"brand");brand.append(this.icon("home"),this.node("h1","irPaT & Eficiență"),this.node("small","dev3","version-label"));header.append(brand);
+    const brand=this.node("div",undefined,"brand");brand.append(this.icon("home"),this.node("h1","irPaT & Eficiență"),this.node("small","dev4","version-label"));header.append(brand);
     const refresh = this.node("button",this.t("Actualizează","Refresh"));
     refresh.disabled = this.busy || this.journalSaving;
     refresh.addEventListener("click",()=>this.refresh());
