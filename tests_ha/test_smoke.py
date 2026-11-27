@@ -33,7 +33,7 @@ async def test_setup_overview_reload(hass: HomeAssistant, hass_ws_client, enable
     assert overview['room_temperatures'][room]['heating']['temperature_c'] == 21.5
     assert overview['defrost'] == {}
     assert overview['energy_history'] == {}
-    await client.send_json({'id': 10, 'type': f'{DOMAIN}/export_data',
+    await client.send_json({'id': 2, 'type': f'{DOMAIN}/export_data',
                             'entry_id': entry.entry_id, 'format': 'json'})
     exported = await client.receive_json()
     assert exported['success'], exported
@@ -42,7 +42,7 @@ async def test_setup_overview_reload(hass: HomeAssistant, hass_ws_client, enable
     assert archive['entry_id'] == entry.entry_id
     assert archive['topology'] == topology
     assert archive['restore_supported'] is False
-    await client.send_json({'id': 11, 'type': f'{DOMAIN}/export_data',
+    await client.send_json({'id': 3, 'type': f'{DOMAIN}/export_data',
                             'entry_id': entry.entry_id, 'format': 'csv', 'section': 'temperatures'})
     exported = await client.receive_json()
     assert exported['success'], exported
@@ -50,18 +50,18 @@ async def test_setup_overview_reload(hass: HomeAssistant, hass_ws_client, enable
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.LOADED
-    await client.send_json({'id': 2, 'type': f'{DOMAIN}/overview'})
+    await client.send_json({'id': 4, 'type': f'{DOMAIN}/overview'})
     response = await client.receive_json()
     assert response['success'], response
     assert len(response['result']) == 1
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.NOT_LOADED
-    await client.send_json({'id': 3, 'type': f'{DOMAIN}/overview'})
+    await client.send_json({'id': 5, 'type': f'{DOMAIN}/overview'})
     response = await client.receive_json()
     assert response['success'], response
     assert response['result'] == []
-    await client.send_json({'id': 12, 'type': f'{DOMAIN}/export_data',
+    await client.send_json({'id': 6, 'type': f'{DOMAIN}/export_data',
                             'entry_id': entry.entry_id, 'format': 'json'})
     exported = await client.receive_json()
     assert not exported['success']
