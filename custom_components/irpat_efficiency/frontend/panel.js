@@ -351,6 +351,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       if(!h)continue;
       box.append(this.node("h3",source.name));
       if(h.save_failed)box.append(this.node("p",this.t("Salvarea istoricului a eșuat.","History save failed."),"status-warm"));
+      if(h.pending_count>0)box.append(this.node("p",this.t("Evenimente în așteptarea salvării: ","Events awaiting storage: ")+h.pending_count,"status-warm"));
       if(!h.recent.length)box.append(this.node("p",this.t("Niciun ciclu complet observat.","No complete cycle observed."),"muted"));
       for(const e of h.recent.slice().reverse()){
         const row=this.node("div",undefined,"room");
@@ -584,17 +585,20 @@ class IrpatEfficiencyPanel extends HTMLElement {
           details.append(this.node("summary",this.t("Senzori","Sensors")+" "+(value?.valid_count??0)+"/"+(value?.configured_count??0)));
           for(const reading of sample?.readings||[]){
             const label = reading.name+": "+(reading.temperature_c==null?"—":reading.temperature_c.toFixed(1)+" °C");
-            const age = reading.age_seconds==null?"":this.t(" · raportat acum "," · reported ")+Math.floor(reading.age_seconds/60)+this.t(" min"," min ago");
+            const age = reading.status==="future"?this.t(" · timestamp în viitor"," · future timestamp"):
+              reading.status==="stale"?this.t(" · citire expirată"," · stale reading"):
+              reading.age_seconds==null?"":this.t(" · raportat acum "," · reported ")+Math.floor(reading.age_seconds/60)+this.t(" min"," min ago");
             details.append(this.node("div",label+age,"muted"));
           }
           left.append(details);
           const right = this.node("div",undefined,"temperature");
-          const status = value?.status||"unknown";
+          const partial = value?.valid_count>0 && value.valid_count<value.configured_count;
+          const status = partial?"unknown":value?.status||"unknown";
           const labels = {within:this.t("În toleranță","Within tolerance"),warm:this.t("Peste țintă","Above target"),cold:this.t("Sub țintă","Below target"),unknown:this.t("Date insuficiente","Insufficient data")};
           const delta = value?.deviation_c;
           right.append(this.node("strong",value?.temperature_c==null?"—":value.temperature_c.toFixed(1)+" °C","status-"+status),
             this.node("small",target==null?this.t("Țintă nesetată","No target"):this.t("Țintă ","Target ")+target.toFixed(1)+" °C"),
-            this.node("small",labels[status]+(delta==null?"":" · "+(delta>0?"+":"")+delta.toFixed(1)+" °C"),"status-"+status));
+            this.node("small",partial?this.t("Citiri parțiale","Partial readings"):labels[status]+(delta==null?"":" · "+(delta>0?"+":"")+delta.toFixed(1)+" °C"),"status-"+status));
           row.append(left,right);
           section.append(row);
           const hist=entry.history?.[room.id];
@@ -603,7 +607,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
             const format=v=>v==null?"—":v.toFixed(1)+" °C";
             const prev=hist.yesterday_same_slot_c;
             const readings=sample?.readings||[];
-            const fresh=readings.length>0&&readings.every(r=>r.temperature_c!=null&&r.age_seconds!=null&&r.age_seconds<=7200);
+            const fresh=readings.length>0&&readings.every(r=>r.status==="reported"&&r.temperature_c!=null);
             const historyBox=this.node("div",undefined,"history");
             const cells=[[this.t("Ieri, aceeași oră (5 min)","Yesterday, same time (5 min)"),format(prev)],
               [this.t("Diferență față de ieri","Difference from yesterday"),!fresh||prev==null||value?.temperature_c==null?"—":format(value.temperature_c-prev)],
@@ -632,7 +636,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
         main.append(section);
       }
     }
-    main.append(this.node("p",this.t("Temperaturile sunt instantanee (media citirilor disponibile), cu toleranță provizorie ±0,3°C. Vechimea citirilor este afișată, dar nu este încă filtrată automat. Istoricul local eșantionează la 5 minute, păstrează 8 zile și exclude rapoartele HA mai vechi de 2 ore; golurile rămân vizibile. Debitele se înregistrează manual în jurnal; nu sunt citiri live. Nu se transmit comenzi instalației.","Temperatures are snapshots (mean of available readings), with provisional ±0.3°C tolerance. Reading age is shown but not yet automatically filtered. Local history samples every 5 minutes, retains 8 days and excludes HA reports older than 2 hours; gaps remain visible. Flows are recorded manually in the journal; they are not live readings. No commands are sent to equipment."),"muted"));
+    main.append(this.node("p",this.t("Temperaturile sunt instantanee (media citirilor disponibile), cu toleranță provizorie ±0,3°C. Citirile expirate (peste 2 ore) sau cu timestamp în viitor sunt excluse. Istoricul local eșantionează la 5 minute, păstrează 8 zile și exclude rapoartele HA mai vechi de 2 ore; golurile rămân vizibile. Debitele se înregistrează manual în jurnal; nu sunt citiri live. Nu se transmit comenzi instalației.","Temperatures are snapshots (mean of available readings), with provisional ±0.3°C tolerance. Stale reports (over 2 hours old) and future timestamps are excluded. Local history samples every 5 minutes, retains 8 days and excludes HA reports older than 2 hours; gaps remain visible. Flows are recorded manually in the journal; they are not live readings. No commands are sent to equipment."),"muted"));
     root.append(main);
   }
 }
