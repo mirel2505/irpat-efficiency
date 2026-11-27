@@ -13,7 +13,7 @@ from homeassistant.helpers.storage import Store
 from .const import DOMAIN, OPERATING_MODES, CIRCUIT_CONTROLS
 from .topology import SOURCE_TYPES, TopologyError, add_item, empty_topology
 from .topology_edit import EDIT_FIELDS, OPTIONAL_FIELDS, edit_item
-from .topology_remove import remove_item
+from .topology_remove import removal_preview, remove_selection
 from .telemetry import ROLE_GROUPS, set_binding
 from .source_settings import FLUID_TYPES, set_source_settings
 from .fuel_economics import (FUEL_KINDS, UNITS, BASES, STRATEGIES, configure_fuel,
@@ -219,15 +219,35 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
         errors = {}
         if user_input is not None:
             try:
-                self._topology = remove_item(self._topology, collection, user_input["item_id"],
-                                             confirmed=user_input.get("confirmed", False))
-                return await self.async_step_init()
+                self._remove_ids = user_input["item_ids"]
+                removal_preview(self._topology, collection, self._remove_ids)
+                return await self.async_step_remove_confirm()
             except TopologyError as exc:
                 errors["base"] = str(exc)
         return self.async_show_form(step_id="remove_item", data_schema=vol.Schema({
-            vol.Required("item_id"): self._reference(collection),
-            vol.Required("confirmed", default=False): selector.BooleanSelector(),
+            vol.Required("item_ids"): self._reference(collection, multiple=True),
         }), errors=errors)
+
+    async def async_step_remove_confirm(self, user_input=None):
+        collection, identifiers = self._remove_collection, self._remove_ids
+        preview = removal_preview(self._topology, collection, identifiers)
+        errors = {}
+        if user_input is not None:
+            if user_input.get("cancel") is True:
+                return await self.async_step_init()
+            try:
+                self._topology = remove_selection(self._topology, collection, identifiers,
+                    confirmed=user_input.get("confirmed", False),
+                    detach_zone_sources=user_input.get("detach_zone_sources", False))
+                return await self.async_step_init()
+            except TopologyError as exc:
+                errors["base"] = str(exc)
+        fields = {vol.Required("confirmed", default=False): selector.BooleanSelector(),
+                  vol.Optional("cancel", default=False): selector.BooleanSelector()}
+        if preview["sources"]:
+            fields[vol.Required("detach_zone_sources", default=False)] = selector.BooleanSelector()
+        return self.async_show_form(step_id="remove_confirm", data_schema=vol.Schema(fields),
+            description_placeholders={k: ", ".join(v) or "—" for k,v in preview.items()}, errors=errors)
 
     async def async_step_edit(self, user_input=None):
         """Choose which kind of existing item to edit."""
