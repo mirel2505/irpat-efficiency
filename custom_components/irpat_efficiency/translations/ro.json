@@ -93,9 +93,9 @@
         "title": "Configurația instalației",
         "description": "Adaugă niveluri și zone, apoi încăperi, distribuitoare, circuite și senzori. Apasă Salvează pentru a păstra modificările.",
         "menu_options": {
-          "floor": "Adaugă nivel",
+          "floor": "Adaugă sau alege nivel",
           "zone": "Adaugă zonă hidraulică",
-          "room": "Adaugă încăpere",
+          "room": "Adaugă sau alege încăpere",
           "source": "Adaugă sursă termică",
           "manifold": "Adaugă distribuitor",
           "circuit": "Adaugă circuit",
@@ -108,13 +108,16 @@
           "source_settings": "Proprietăți și tarif sursă",
           "mode_source": "Regim real sursă",
           "edit": "Editează configurația existentă",
-          "remove": "Elimină un element din configurație"
+          "remove": "Elimină un element din configurație",
+          "import_structure": "Importă nivelurile și încăperile Home Assistant",
+          "discover_sensors": "Detectează senzorii încăperii"
         }
       },
       "floor": {
-        "title": "Adaugă nivel",
-        "data": {
-          "name": "Denumire proprie"
+        "title": "Adaugă sau alege nivel",
+        "menu_options": {
+          "floor_existing": "Alege nivel existent în Home Assistant",
+          "floor_custom": "Creează nivel propriu în irPaT"
         }
       },
       "zone": {
@@ -126,13 +129,10 @@
         }
       },
       "room": {
-        "title": "Adaugă încăpere",
-        "data": {
-          "name": "Denumire proprie",
-          "floor_id": "Nivel",
-          "area_m2": "Suprafață",
-          "heating_target_c": "Țintă încălzire",
-          "cooling_target_c": "Țintă răcire"
+        "title": "Adaugă sau alege încăpere",
+        "menu_options": {
+          "room_existing": "Alege încăpere existentă în Home Assistant",
+          "room_custom": "Creează încăpere proprie în irPaT"
         }
       },
       "source": {
@@ -284,6 +284,62 @@
           "item_id": "Element",
           "confirmed": "Confirm eliminarea din configurație"
         }
+      },
+      "floor_custom": {
+        "title": "Adaugă nivel",
+        "data": {
+          "name": "Denumire proprie"
+        }
+      },
+      "room_custom": {
+        "title": "Adaugă încăpere",
+        "data": {
+          "name": "Denumire proprie",
+          "floor_id": "Nivel",
+          "area_m2": "Suprafață",
+          "heating_target_c": "Țintă încălzire",
+          "cooling_target_c": "Țintă răcire"
+        }
+      },
+      "floor_existing": {
+        "title": "Alege nivel existent",
+        "description": "Reutilizează un nivel irPaT cu nume identic dacă este unic, păstrând identificatorul. Nu modifică registrele Home Assistant.",
+        "data": {
+          "ha_floor_id": "Nivel Home Assistant"
+        }
+      },
+      "room_existing": {
+        "title": "Alege încăpere existentă",
+        "description": "Folosește nivelul nativ când este asociat. O încăpere fără nivel necesită un nivel local de rezervă. O încăpere locală cu nume identic și același nivel este reutilizată dacă este unică. Câmpurile goale păstrează valorile existente. Confirmă doar senzori ambientali reali la pasul următor.",
+        "data": {
+          "ha_area_id": "Încăpere Home Assistant",
+          "fallback_floor": "Nivel pentru încăpere fără nivel (opțional)",
+          "area_m2": "Suprafață",
+          "heating_target_c": "Țintă încălzire",
+          "cooling_target_c": "Țintă răcire"
+        }
+      },
+      "import_structure": {
+        "title": "Importă nivelurile și încăperile Home Assistant",
+        "description": "Am găsit {floors} niveluri și {rooms} încăperi ({unassigned} fără nivel valid). Importă nivelurile și încăperile cu nivel. Încăperile fără nivel sunt omise dacă nu alegi mai jos un nivel local adăugat anterior. Elementelor locale unice cu același nume li se asociază identificatorii nativi; țintele și senzorii rămân. Registrele HA nu sunt modificate. Verifică separat senzorii, apoi salvează.",
+        "data": {
+          "confirmed": "Confirm importul și asocierea elementelor locale existente",
+          "fallback_floor": "Nivel pentru toate încăperile fără nivel (opțional)"
+        }
+      },
+      "discover_sensors": {
+        "title": "Detectează senzorii încăperii",
+        "data": {
+          "room_id": "Încăpere asociată"
+        }
+      },
+      "confirm_sensors": {
+        "title": "Confirmă senzorii propuși",
+        "description": "{count} candidați neutilizați din această încăpere sau dispozitivele ei. Alege doar temperatura aerului (nu tur, retur sau pardoseală) ori termostate care raportează temperatura curentă. Nu selecta măsurători duplicate ale aceleiași sonde. Alege cel mult un senzor de umiditate. Selecția goală nu adaugă nimic; asocierile existente nu sunt înlocuite.",
+        "data": {
+          "temperatures": "Senzori de temperatură / termostate",
+          "humidity": "Senzor de umiditate"
+        }
       }
     },
     "error": {
@@ -305,7 +361,10 @@
       "invalid_mode_mapping": "Valorile trebuie să fie distincte, valide și să includă cel puțin o stare.",
       "unsupported_edit": "Această schimbare structurală necesită un element nou.",
       "object_in_use": "Alte elemente depind de acesta. Elimină mai întâi dependențele.",
-      "remove_confirmation_required": "Este necesară confirmarea explicită."
+      "remove_confirmation_required": "Este necesară confirmarea explicită.",
+      "registry_conflict": "Asociere locală ambiguă. Redenumește elementele locale aflate în conflict înainte de import.",
+      "registry_floor_required": "Încăperea nu are nivel asociat. Adaugă întâi un nivel local sau alege unul de rezervă.",
+      "registry_confirmation_required": "Confirmă explicit importul."
     }
   }
 }
