@@ -985,29 +985,58 @@ class IrpatEfficiencyPanel extends HTMLElement {
     const searchBox=this.node("div",undefined,"entity-search-box");searchBox.hidden=true;
     const search=this.node("input");search.type="search";search.placeholder=this.t("ID sau nume senzor…","Entity ID or name…");search.autocomplete="off";search.spellcheck=false;search.setAttribute("aria-label",this.t("Filtrează: ","Filter: ")+label);
     const count=this.node("small",undefined,"muted");count.setAttribute("aria-live","polite");
-    searchBox.append(search,count);group.append(searchBox,field);form.append(group);
+    const results=this.node("div",undefined,"entity-results");
+    results.setAttribute("role","group");results.setAttribute("aria-label",this.t("Sugestii entități","Entity suggestions"));
+    searchBox.append(search,count,results);group.append(searchBox,field);form.append(group);
     const all=new Map(options.map(([id,name])=>[id,name]));
     if(value&&!all.has(value))all.set(value,value);
     const normalize=v=>String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+    let limit=20;
+    const choose=id=>{
+      field.value=id;
+      field.dispatchEvent(new Event("change",{bubbles:true}));
+      search.value="";limit=20;searchBox.hidden=true;toggle.setAttribute("aria-expanded","false");
+      refill(id);toggle.focus();
+    };
     const refill=(selected)=>{
       const terms=normalize(search.value).trim().split(/\s+/).filter(Boolean);
       const matches=[...all].filter(([id,name])=>id&&terms.every(term=>normalize(id+" "+name).includes(term)));
+      const query=normalize(search.value).trim();
+      if(query)matches.sort((a,b)=>Number(normalize(b[0])===query)-Number(normalize(a[0])===query)||Number(normalize(b[0]).startsWith(query))-Number(normalize(a[0]).startsWith(query)));
+      const ids=new Set(matches.map(([id])=>id));
       field.replaceChildren();
       for(const [id,name] of all){
-        if(!id||id===selected||matches.some(([mid])=>mid===id)){
+        if(!id||id===selected||ids.has(id)){
           const o=this.node("option",name);o.value=id;field.append(o);
         }
       }
       field.value=selected;
       count.textContent=matches.length?matches.length+" "+this.t("rezultate","matches"):this.t("Niciun rezultat compatibil","No compatible matches");
+      results.replaceChildren();
+      if(searchBox.hidden)return;
+      for(const [id,name] of matches.slice(0,limit)){
+        const option=this.node("button",undefined,"entity-result");
+        option.type="button";option.dataset.entityId=id;option.setAttribute("aria-pressed",String(id===selected));
+        const displayName=String(name).replace(" ("+id+")","");
+        option.append(this.node("strong",displayName),this.node("small",id,"entity-result-id"));
+        option.addEventListener("click",()=>choose(id));results.append(option);
+      }
+      if(matches.length>limit){
+        const more=this.node("button",this.t("Mai multe rezultate","Show more results"),"secondary entity-more");
+        more.type="button";more.addEventListener("click",()=>{const old=limit;limit+=20;refill(field.value);results.querySelectorAll(".entity-result")[old]?.focus();});results.append(more);
+      }
     };
     refill(value??"");
     toggle.addEventListener("click",()=>{
       searchBox.hidden=!searchBox.hidden;toggle.setAttribute("aria-expanded",String(!searchBox.hidden));
-      if(searchBox.hidden){search.value="";refill(field.value);}else search.focus();
+      limit=20;if(searchBox.hidden){search.value="";refill(field.value);}else {refill(field.value);search.focus();}
     });
-    search.addEventListener("input",()=>refill(field.value));
-    search.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();field.focus();}else if(e.key==="Escape"){e.preventDefault();search.value="";refill(field.value);searchBox.hidden=true;toggle.setAttribute("aria-expanded","false");toggle.focus();}});
+    search.addEventListener("input",()=>{limit=20;refill(field.value);});
+    search.addEventListener("keydown",e=>{
+      if(e.key==="Enter"){e.preventDefault();const first=results.querySelector(".entity-result");if(first&&normalize(first.dataset.entityId)===normalize(search.value).trim())choose(first.dataset.entityId);else first?.focus();}
+      else if(e.key==="ArrowDown"){e.preventDefault();results.querySelector(".entity-result")?.focus();}
+      else if(e.key==="Escape"){e.preventDefault();search.value="";searchBox.hidden=true;toggle.setAttribute("aria-expanded","false");refill(field.value);toggle.focus();}
+    });
     field.addEventListener("change",()=>{if(search.value){search.value="";refill(field.value);}});
     return field;
   }
@@ -1392,11 +1421,12 @@ class IrpatEfficiencyPanel extends HTMLElement {
       @media(min-width:720px){.setup-nav{grid-template-columns:repeat(6,minmax(0,1fr))}.dashboard-controls{grid-template-columns:auto minmax(0,1fr);align-items:center}.dashboard-toggles{justify-self:end;width:min(100%,440px)}.room-grid{grid-template-columns:repeat(auto-fit,minmax(275px,1fr))}}
       @media(max-width:340px){.brand h1{font-size:.92rem}.brand .line-icon{display:none}.dashboard-toggles .mode button{font-size:.71rem}.comfort-metric strong{font-size:1.18rem}.room-tile .room{grid-template-columns:minmax(0,1fr) auto}.room-tile .room>.line-icon{display:none}}
       .entity-picker{display:grid;gap:4px;min-width:0}.entity-picker-head{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:.9rem}.entity-picker-head>span{min-width:0;overflow-wrap:anywhere}.setup .entity-search-toggle{display:inline-flex;align-items:center;gap:4px;padding:4px 7px;min-height:36px;font-size:.76rem;white-space:nowrap;color:var(--primary-text-color);background:color-mix(in srgb,var(--ir-violet) 14%,var(--card-background-color));border:1px solid color-mix(in srgb,var(--ir-violet) 40%,transparent)}.entity-search-box{display:grid;gap:3px}.entity-search-box[hidden]{display:none}.entity-search-box small{font-size:.72rem}.entity-picker select{max-width:100%}
+      .entity-results{display:grid;gap:3px;max-height:245px;overflow-y:auto;overscroll-behavior:contain;min-width:0;padding:2px}.entity-results:empty{display:none}.setup .entity-result{display:grid;gap:2px;text-align:left;justify-items:start;min-height:44px;padding:6px 8px;min-width:0;width:100%;font-weight:400;background:color-mix(in srgb,var(--ir-violet) 7%,var(--card-background-color));color:var(--primary-text-color);border:1px solid var(--ir-edge);overflow-wrap:anywhere;white-space:normal}.entity-result strong{font-size:.82rem;line-height:1.25}.entity-result-id{font-family:monospace;font-size:.72rem;line-height:1.25;color:var(--secondary-text-color);overflow-wrap:anywhere}.setup .entity-result[aria-pressed=true]{border-color:var(--ir-violet);background:color-mix(in srgb,var(--ir-violet) 15%,var(--card-background-color))}.setup .entity-more{min-height:40px}
     `;
     root.append(style);
     const main = this.node("main");
     const header = this.node("header");
-    const brand=this.node("div",undefined,"brand");brand.append(this.icon("home"),this.node("h1","irPaT & Eficiență"),this.node("small","dev4","version-label"));header.append(brand);
+    const brand=this.node("div",undefined,"brand");brand.append(this.icon("home"),this.node("h1","irPaT & Eficiență"),this.node("small","dev5","version-label"));header.append(brand);
     const refresh = this.node("button",this.t("Actualizează","Refresh"));
     refresh.disabled = this.busy || this.journalSaving;
     refresh.addEventListener("click",()=>this.refresh());
