@@ -8,6 +8,7 @@ import voluptuous as vol
 
 from .const import DOMAIN
 from .topology import empty_topology
+from .temperature_reader import read_rooms
 
 PANEL_PATH = "irpat-efficiency"
 ASSET_URL = "/irpat_efficiency_assets/panel.js"
@@ -20,10 +21,12 @@ def ws_overview(hass, connection, msg):
     """Return configuration only to an authenticated administrator."""
     entries = [entry for entry in hass.config_entries.async_entries(DOMAIN)
                if entry.entry_id in hass.data.get(DOMAIN, {}).get("active_entries", set())]
-    connection.send_result(msg["id"], [
-        {"name": entry.title, "topology": entry.options.get("topology", empty_topology())}
-        for entry in entries
-    ])
+    overview = []
+    for entry in entries:
+        topology = entry.options.get("topology", empty_topology())
+        overview.append({"name": entry.title, "topology": topology,
+                         "room_temperatures": read_rooms(hass, topology)})
+    connection.send_result(msg["id"], overview)
 
 
 async def async_register(hass):
