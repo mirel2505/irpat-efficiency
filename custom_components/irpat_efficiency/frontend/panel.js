@@ -335,6 +335,28 @@ class IrpatEfficiencyPanel extends HTMLElement {
     return box;
   }
 
+  defrostHistory(entry) {
+    const history=entry.defrost||{};
+    if(!Object.keys(history).length)return this.node("div");
+    const box=this.node("section",undefined,"card");
+    box.append(this.node("h2",this.t("Istoric degivrări","Defrost history")));
+    for(const source of entry.topology.sources||[]){
+      const h=history[source.id];
+      if(!h)continue;
+      box.append(this.node("h3",source.name));
+      if(h.save_failed)box.append(this.node("p",this.t("Salvarea istoricului a eșuat.","History save failed."),"status-warm"));
+      if(!h.recent.length)box.append(this.node("p",this.t("Niciun ciclu complet observat.","No complete cycle observed."),"muted"));
+      for(const e of h.recent.slice().reverse()){
+        const row=this.node("div",undefined,"room");
+        row.append(this.node("span",new Date(e.start*1000).toLocaleString()),
+          this.node("span",this.t("Durată ~","Duration ~")+(e.duration_s/60).toFixed(1)+" min · "+(e.electric_kwh==null?"—":e.electric_kwh.toFixed(3)+" kWh")+" · "+this.t("Scădere tur ","Supply drop ")+(e.observed_supply_drop_c==null?"—":e.observed_supply_drop_c.toFixed(1)+" °C")));
+        box.append(row);
+      }
+    }
+    box.append(this.node("small",this.t("Ultimele 20 de cicluri complete pentru fiecare sursă. Eșantionare la 30 s; valorile sunt estimări, iar ciclurile incomplete nu sunt numărate.","Last 20 complete cycles per source. Sampled every 30 s; values are estimates and incomplete cycles are not counted."),"muted"));
+    return box;
+  }
+
   render() {
     const root = this.shadowRoot;
     root.replaceChildren();
@@ -399,7 +421,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       const grid = this.node("div",undefined,"grid");
       for (const [key,ro,en] of [["floors","Niveluri","Floors"],["rooms","Încăperi","Rooms"],["manifolds","Distribuitoare","Manifolds"],["circuits","Circuite","Circuits"],["zones","Zone","Zones"],["sources","Surse","Sources"]])
         grid.append(this.card(this.t(ro,en),(t[key]||[]).length));
-      main.append(grid,this.liveDiagnostics(entry),this.thermalDiagnostics(entry),this.referenceProfiles(entry),this.weatherObservations(entry));
+      main.append(grid,this.liveDiagnostics(entry),this.defrostHistory(entry),this.thermalDiagnostics(entry),this.referenceProfiles(entry),this.weatherObservations(entry));
       const rooms = new Map((t.rooms||[]).map(r=>[r.id,r]));
       for (const floor of t.floors||[]) {
         const section = this.node("section",undefined,"card");
