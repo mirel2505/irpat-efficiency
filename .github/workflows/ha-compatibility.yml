@@ -15,8 +15,10 @@ jobs:
         include:
           - core: '2026.10.4'
             test_package: 'pytest-homeassistant-custom-component==0.13.375'
+            frontend: 'home-assistant-frontend==20260930.5'
           - core: '2026.11.2'
             test_package: 'pytest-homeassistant==2026.11.2'
+            frontend: 'home-assistant-frontend==20261028.6'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,7 +31,8 @@ jobs:
         env:
           HA_CORE: ${{ matrix.core }}
           TEST_PACKAGE: ${{ matrix.test_package }}
-        run: python -m pip install "homeassistant==$HA_CORE" "$TEST_PACKAGE"
+          HA_FRONTEND: ${{ matrix.frontend }}
+        run: python -m pip install "homeassistant==$HA_CORE" "$TEST_PACKAGE" "$HA_FRONTEND"
       - name: Verify pinned version and run integration smoke test
         env:
           HA_CORE: ${{ matrix.core }}
