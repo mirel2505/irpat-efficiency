@@ -13,6 +13,7 @@ from .topology import empty_topology
 from .temperature_reader import read_rooms
 from .telemetry_reader import read_telemetry
 from .live_diagnostics import live_diagnostics
+from .operation_mode import classify_mode
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,12 +38,23 @@ def ws_overview(hass, connection, msg):
         energy = hass.data[DOMAIN]["energy_monitors"].get(entry.entry_id)
         rooms = read_rooms(hass, topology)
         telemetry = read_telemetry(hass, topology)
+        modes = {}
+        for source in topology["sources"]:
+            binding = source.get("mode_binding")
+            if not binding:
+                continue
+            state = hass.states.get(binding["entity_id"])
+            reported = (getattr(state, "last_reported", None) or state.last_updated) if state else None
+            modes[source["id"]] = classify_mode(
+                binding, state.state if state else None,
+                reported.timestamp() if reported else None, dt_util.utcnow().timestamp())
         overview.append({"entry_id": entry.entry_id, "name": entry.title, "topology": topology,
                          "profiles": profiles.list_profiles() if profiles else [],
                          "defrost": monitor.overview(topology) if monitor else {},
                          "journal": journal.recent() if journal else [],
                          "room_temperatures": rooms,
                          "telemetry": telemetry,
+                         "reported_modes": modes,
                          "energy_history": energy.overview(topology, telemetry) if energy else {},
                          "energy_save_failed": energy.save_failed if energy else False,
                          "live_diagnostics": live_diagnostics(topology, telemetry, rooms, dt_util.utcnow().timestamp()),
