@@ -15,6 +15,7 @@ from .telemetry_reader import read_telemetry
 from .live_diagnostics import live_diagnostics
 from .operation_mode import classify_mode
 from .report_inputs import prepare_capture
+from .profile_review import review_profile
 from .data_export import CSV_SECTIONS, capture as capture_export, serialize as serialize_export
 
 _LOGGER = logging.getLogger(__name__)
@@ -259,6 +260,40 @@ async def ws_export_data(hass, connection, msg):
     connection.send_result(msg["id"], result)
 
 
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/profile_review",
+    vol.Required("entry_id"): str,
+    vol.Required("profile_id"): str,
+    vol.Required("snapshot_id"): str,
+})
+@websocket_api.require_admin
+@callback
+def ws_profile_review(hass, connection, msg):
+    """Compare stored references with observations; never adjust equipment."""
+    runtime = hass.data.get(DOMAIN, {})
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if (entry is None or entry.domain != DOMAIN
+            or entry.entry_id not in runtime.get("active_entries", set())):
+        connection.send_error(msg["id"], "not_found", "No active installation")
+        return
+    profiles = runtime.get("profiles", {}).get(entry.entry_id)
+    journal = runtime.get("journals", {}).get(entry.entry_id)
+    if profiles is None or journal is None:
+        connection.send_error(msg["id"], "not_found", "No active profile or journal")
+        return
+    profile = next((p for p in profiles.profiles if p["id"] == msg["profile_id"]), None)
+    snapshot = next((s for s in journal.entries if s["id"] == msg["snapshot_id"]), None)
+    if profile is None or snapshot is None:
+        connection.send_error(msg["id"], "not_found", "No stored reference or observation")
+        return
+    try:
+        result = review_profile(entry.options.get("topology", empty_topology()), profile, snapshot)
+    except ValueError as exc:
+        connection.send_error(msg["id"], "invalid_comparison", str(exc))
+        return
+    connection.send_result(msg["id"], result)
+
+
 async def async_register(hass):
     """Register the API and static asset once per HA runtime."""
     runtime = hass.data[DOMAIN]
@@ -271,6 +306,7 @@ async def async_register(hass):
         websocket_api.async_register_command(hass, ws_overview)
         websocket_api.async_register_command(hass, ws_journal_append)
         websocket_api.async_register_command(hass, ws_profile_create)
+        websocket_api.async_register_command(hass, ws_profile_review)
         websocket_api.async_register_command(hass, ws_report_capture)
         websocket_api.async_register_command(hass, ws_report_compare)
         websocket_api.async_register_command(hass, ws_export_data)
