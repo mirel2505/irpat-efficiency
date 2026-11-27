@@ -1,5 +1,6 @@
 """Register the local, administrator-only overview panel."""
 from pathlib import Path
+import logging
 
 from homeassistant.components import frontend, panel_custom, websocket_api
 from homeassistant.components.http import StaticPathConfig
@@ -9,6 +10,8 @@ import voluptuous as vol
 from .const import DOMAIN
 from .topology import empty_topology
 from .temperature_reader import read_rooms
+
+_LOGGER = logging.getLogger(__name__)
 
 PANEL_PATH = "irpat-efficiency"
 ASSET_URL = "/irpat_efficiency_assets/panel.js"
@@ -25,11 +28,56 @@ def ws_overview(hass, connection, msg):
     for entry in entries:
         topology = entry.options.get("topology", empty_topology())
         history = hass.data[DOMAIN]["histories"].get(entry.entry_id)
-        overview.append({"name": entry.title, "topology": topology,
+        journal = hass.data[DOMAIN]["journals"].get(entry.entry_id)
+        overview.append({"entry_id": entry.entry_id, "name": entry.title, "topology": topology,
+                         "journal": journal.recent() if journal else [],
                          "room_temperatures": read_rooms(hass, topology),
                          "history": history.overview(topology) if history else {},
                          "history_save_failed": history.save_failed if history else False})
     connection.send_result(msg["id"], overview)
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/journal_append",
+    vol.Required("entry_id"): str,
+    vol.Required("manifold_id"): str,
+    vol.Required("readings"): {str: vol.Any(int, float, None)},
+    vol.Required("phase"): vol.In(("observation", "before", "after")),
+    vol.Optional("previous_id"): str,
+    vol.Optional("manifold_total_lmin"): vol.Any(int, float),
+    vol.Optional("source_total_m3h"): vol.Any(int, float),
+    vol.Optional("note", default=""): vol.All(str, vol.Length(max=2000)),
+})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_journal_append(hass, connection, msg):
+    """Save a manual observation, never control hardware."""
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    journal = hass.data.get(DOMAIN, {}).get("journals", {}).get(msg["entry_id"])
+    if entry is None or entry.domain != DOMAIN or journal is None:
+        connection.send_error(msg["id"], "not_found", "No active journal")
+        return
+    topology = entry.options.get("topology", empty_topology())
+    rooms = read_rooms(hass, topology)
+    manifold = next((m for m in topology["manifolds"] if m["id"] == msg["manifold_id"]), None)
+    zone = next((z for z in topology["zones"] if manifold and z["id"] == manifold["zone_id"]), None)
+    context = {"room_temperatures": rooms, "zone": zone}
+    try:
+        result = await journal.async_append(
+            topology, msg["manifold_id"], msg["readings"],
+            phase=msg["phase"], previous_id=msg.get("previous_id"),
+            manifold_total_lmin=msg.get("manifold_total_lmin"),
+            source_total_m3h=msg.get("source_total_m3h"),
+            note=msg["note"], context=context,
+        )
+    except ValueError as exc:
+        connection.send_error(msg["id"], "invalid_observation", str(exc))
+        return
+    except Exception:
+        _LOGGER.exception("Could not save hydraulic observation")
+        connection.send_error(msg["id"], "save_failed", "Journal save failed")
+        return
+    connection.send_result(msg["id"], result)
 
 
 async def async_register(hass):
@@ -42,6 +90,7 @@ async def async_register(hass):
         runtime["static_registered"] = True
     if not runtime.get("api_registered"):
         websocket_api.async_register_command(hass, ws_overview)
+        websocket_api.async_register_command(hass, ws_journal_append)
         runtime["api_registered"] = True
     if not runtime.get("panel_registered"):
         await panel_custom.async_register_panel(
