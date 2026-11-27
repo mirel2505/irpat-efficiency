@@ -12,6 +12,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
     this.historyHours = '24';
     this.timer = null;
     this.journalDrafts = new Map();
+    this.exportUrls = new Set();
     this.journalSaving = false;
   }
 
@@ -27,6 +28,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
   }
 
   disconnectedCallback() {
+    this.clearExportUrls();
     if (this.timer !== null) clearInterval(this.timer);
     this.timer = null;
   }
@@ -409,6 +411,56 @@ class IrpatEfficiencyPanel extends HTMLElement {
     return box;
   }
 
+  exportData(entry) {
+    const box=this.node("details",undefined,"card journal");
+    box.append(this.node("summary",this.t("Export date","Export data")));
+    box.append(this.node("p",this.t("Fișierele includ date private despre instalație. Exportul JSON este o arhivă de analiză, nu un backup restaurabil. În CSV, energia asociată este un subset al consumului total; nu aduna aceste rânduri.","Files include private installation information. JSON is an analysis archive, not a restorable backup. Matched energy in CSV is a subset of total consumption; do not add these rows together."),"muted"));
+    const select=this.node("select");
+    for(const [value,ro,en] of [
+      ["json","Arhivă JSON","JSON archive"],["temperatures","Temperaturi CSV","Temperatures CSV"],
+      ["energy","Energie CSV","Energy CSV"],["hydraulics","Debite CSV","Hydraulics CSV"],
+      ["profiles","Profiluri CSV","Profiles CSV"],["observations","Observații CSV","Observations CSV"],
+      ["comparisons","Comparații CSV","Comparisons CSV"],["defrost","Degivrări CSV","Defrost CSV"],
+      ["modes","Regimuri CSV","Modes CSV"]
+    ])select.append(new Option(this.t(ro,en),value));
+    const label=this.node("label",this.t("Format și categorie","Format and category"));label.append(select);
+    const button=this.node("button",this.t("Pregătește exportul","Prepare export"));button.type="button";
+    const status=this.node("p","");status.setAttribute("role","status");
+    const result=this.node("div");
+    box.append(label,button,status,result);
+    const clear=()=>{
+      for(const link of result.querySelectorAll("a[data-export-url]")){
+        URL.revokeObjectURL(link.href);this.exportUrls.delete(link.href);
+      }
+      result.replaceChildren();status.textContent="";
+    };
+    select.addEventListener("change",clear);
+    button.addEventListener("click",async()=>{
+      if(!this._hass||this.busy||this.journalSaving)return;
+      clear();this.journalSaving=true;button.disabled=true;select.disabled=true;
+      try{
+        const selection=select.value;
+        const file=await this._hass.callWS({type:"irpat_efficiency/export_data",entry_id:entry.entry_id,
+          format:selection==="json"?"json":"csv",...(selection==="json"?{}:{section:selection})});
+        if(!box.isConnected)return;
+        const url=URL.createObjectURL(new Blob([file.content],{type:file.mime+";charset=utf-8"}));
+        this.exportUrls.add(url);
+        const link=this.node("a",this.t("Descarcă fișierul","Download file"),"action");
+        link.href=url;link.download=file.filename;link.dataset.exportUrl="true";result.append(link);
+        const warnings=Object.values(file.storage_status||{}).some(v=>v===true||(typeof v==="number"&&v>0));
+        status.textContent=warnings?this.t("Export pregătit. Există salvări eșuate sau evenimente nesalvate excluse.","Export ready. Failed saves or excluded pending events exist."):this.t("Export pregătit.","Export ready.");
+      }catch(error){
+        if(box.isConnected)status.textContent=this.t("Exportul a eșuat. Dacă fișierul depășește 4 MiB, încearcă o categorie CSV.","Export failed. If the file exceeds 4 MiB, try a CSV category.")+" ("+String(error?.message||"")+")";
+      }finally{this.journalSaving=false;button.disabled=false;select.disabled=false;}
+    });
+    return box;
+  }
+
+  clearExportUrls() {
+    for(const url of this.exportUrls)URL.revokeObjectURL(url);
+    this.exportUrls.clear();
+  }
+
   buildingReports(entry) {
     const box=this.node("section",undefined,"card");
     box.append(this.node("h2",this.t("Rapoarte comparative ale clădirii","Building comparison reports")));
@@ -506,6 +558,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
   }
 
   render() {
+    this.clearExportUrls();
     const root = this.shadowRoot;
     root.replaceChildren();
     const style = this.node("style");
@@ -569,7 +622,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       const grid = this.node("div",undefined,"grid");
       for (const [key,ro,en] of [["floors","Niveluri","Floors"],["rooms","Încăperi","Rooms"],["manifolds","Distribuitoare","Manifolds"],["circuits","Circuite","Circuits"],["zones","Zone","Zones"],["sources","Surse","Sources"]])
         grid.append(this.card(this.t(ro,en),(t[key]||[]).length));
-      main.append(grid,this.liveDiagnostics(entry),this.energyHistory(entry),this.defrostHistory(entry),this.thermalDiagnostics(entry),this.referenceProfiles(entry),this.weatherObservations(entry),this.buildingReports(entry));
+      main.append(grid,this.liveDiagnostics(entry),this.energyHistory(entry),this.defrostHistory(entry),this.thermalDiagnostics(entry),this.referenceProfiles(entry),this.weatherObservations(entry),this.buildingReports(entry),this.exportData(entry));
       const rooms = new Map((t.rooms||[]).map(r=>[r.id,r]));
       for (const floor of t.floors||[]) {
         const section = this.node("section",undefined,"card");
