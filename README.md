@@ -35,15 +35,23 @@ Temperature history samples every five minutes while HA is running; reports olde
 
 Use **Settings → System → Backups** and include Home Assistant settings. Keep the backup and emergency kit outside the HA device. The integration retries pending defrost/mode journal saves before native backup. This is not an atomic snapshot across all stores; unsaved records may be lost. Restoring HA settings may replace other system configuration. Keep a current backup before restoring. CSV/JSON are analysis archives, not directly restorable backups. See [official HA backup guidance](https://www.home-assistant.io/common-tasks/general/backups/).
 
-## Instalare / Installation — not released
+## Instalare beta privată / Private beta installation
 
-Planned distribution targets are Home Assistant Marketplace and compatible HACS installations. Metadata and links are prepared; distribution through these catalogs is not yet validated and the repository is private. The private GitHub Actions candidate contains the tracked integration folder, documentation and a SHA-256 checksum. It is not a public release.
+The repository remains private. Marketplace/HACS distribution is not yet validated. **The configuration link below does not install the code.**
 
-[![Open in Home Assistant Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=mirel2505&repository=irpat-efficiency&category=integration)
+1. Open the [validated private beta artifact](https://github.com/mirel2505/irpat-efficiency/actions/runs/45986377754/artifacts/15191098252) while signed in to GitHub. Artifacts expire after 14 days; if expired, use the latest successful Calculation tests run under [Actions](https://github.com/mirel2505/irpat-efficiency/actions/workflows/tests.yml) and verify its matching Core/browser runs.
+2. Extract the downloaded artifact, then extract its inner `irpat-efficiency-<commit>.zip`. Verify the inner ZIP against `SHA256SUMS.txt`.
+3. Make a current Home Assistant backup. Copy the entire inner `custom_components/irpat_efficiency` directory into the Home Assistant configuration directory's `custom_components` folder (on HAOS, typically `/config/custom_components/irpat_efficiency`). Ensure `manifest.json` is directly inside `irpat_efficiency`, with all subdirectories intact.
+4. Restart Home Assistant Core normally once, then open Settings → Devices & services → Add integration and search for **irPaT & Eficiență**.
+5. Only after the integration files are installed, use the configuration shortcut if desired:
 
-[![Configure irPaT & Eficiență in Home Assistant](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=irpat_efficiency)
+[![Configure irPaT & Eficiență after installation](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=irpat_efficiency)
 
-Release and catalog availability require owner approval and validation. See the [Marketplace integration guide](https://contributors.home-assistant.io/marketplace/guides/integrations/).
+If Home Assistant reports that UI configuration is unsupported after copying the files and restarting, check the directory structure and Settings → System → Logs for `irpat_efficiency`. Do not repeatedly restart or update Core without identifying the error.
+
+**RO:** Descarcă arhiva privată, dezarhivează ambele ZIP-uri, copiază directorul `irpat_efficiency` în `custom_components`, apoi repornește Core o singură dată. Linkul de configurare funcționează doar după instalarea codului. Fă un backup înainte. Versiunea beta rămâne consultativă și nu comandă instalația.
+
+Marketplace and HACS distribution will be documented when validated and approved. See the [Marketplace integration guide](https://contributors.home-assistant.io/marketplace/guides/integrations/).
 
 ## Development and verification
 
