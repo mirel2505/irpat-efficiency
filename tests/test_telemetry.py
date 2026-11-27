@@ -49,3 +49,17 @@ class TelemetryTests(unittest.TestCase):
         self.assertEqual(convert('defrost', 'on', None), (True, None))
         self.assertEqual(convert('defrost', 'off', None), (False, None))
         self.assertEqual(convert('defrost', 'unknown', None), (None, None))
+
+    def test_sensor_change_revokes_confirmation(self):
+        t = set_binding(self.t, 'sources', 's', 'electrical_power', 'sensor.power')
+        t['sources'][0].update(power_boundary_confirmed=True, energy_boundary_confirmed=True)
+        same = set_binding(t, 'sources', 's', 'electrical_power', 'sensor.power', 'Renamed')
+        self.assertTrue(same['sources'][0]['power_boundary_confirmed'])
+        changed = set_binding(t, 'sources', 's', 'electrical_power', 'sensor.other')
+        self.assertFalse(changed['sources'][0]['power_boundary_confirmed'])
+        self.assertTrue(changed['sources'][0]['energy_boundary_confirmed'])
+        energy = set_binding(t, 'sources', 's', 'electrical_energy', 'sensor.energy')
+        self.assertFalse(energy['sources'][0]['energy_boundary_confirmed'])
+        self.assertTrue(energy['sources'][0]['power_boundary_confirmed'])
+        removed = set_binding(t, 'sources', 's', 'electrical_power', None)
+        self.assertFalse(removed['sources'][0]['power_boundary_confirmed'])
