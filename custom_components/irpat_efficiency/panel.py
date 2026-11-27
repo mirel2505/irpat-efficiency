@@ -24,8 +24,11 @@ def ws_overview(hass, connection, msg):
     overview = []
     for entry in entries:
         topology = entry.options.get("topology", empty_topology())
+        history = hass.data[DOMAIN]["histories"].get(entry.entry_id)
         overview.append({"name": entry.title, "topology": topology,
-                         "room_temperatures": read_rooms(hass, topology)})
+                         "room_temperatures": read_rooms(hass, topology),
+                         "history": history.overview(topology) if history else {},
+                         "history_save_failed": history.save_failed if history else False})
     connection.send_result(msg["id"], overview)
 
 
