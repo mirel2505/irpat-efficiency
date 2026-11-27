@@ -91,8 +91,65 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
         if self._topology != self._base:
             menu.append("discard_draft")
         menu.append("save")
-        return self.async_show_menu(step_id="init", menu_options=menu,
-                                    )
+        # Keep a fixed overview; expert actions remain available without a migration.
+        menu.insert(menu.index("save"), "overview_menu")
+        if t["rooms"]:
+            menu.insert(menu.index("save"), "room_setup")
+        section = getattr(self, "_section", "overview")
+        groups = {
+            "building_menu": ("floor", "import_structure", "outdoor"),
+            "hydraulics_menu": ("zone", "manifold", "circuit", "telemetry_manifolds"),
+            "rooms_menu": ("room", "room_setup", "discover_sensors", "binding", "telemetry_rooms"),
+            "sources_menu": ("source", "source_settings", "telemetry_sources", "mode_source", "economic_source", "hybrid_zone"),
+            "manage_menu": ("edit", "remove", "discard_draft"),
+        }
+        summary = {
+            "floors": str(len(t["floors"])), "rooms": str(len(t["rooms"])),
+            "zones": str(len(t["zones"])), "manifolds": str(len(t["manifolds"])),
+            "circuits": str(len(t["circuits"])), "sources": str(len(t["sources"])),
+            "missing_sensors": str(sum(not any(b["room_id"] == r["id"] for b in t["bindings"]) for r in t["rooms"])),
+            "missing_circuits": str(sum(not any(c.get("room_id") == r["id"] for c in t["circuits"]) for r in t["rooms"])),
+            "pending": str(int(t != self._base)),
+        }
+        if section == "all_actions":
+            return self.async_show_menu(step_id="all_actions", menu_options=menu, description_placeholders=summary)
+        if section in groups:
+            actions = [key for key in groups[section] if key in menu]
+            if section == "manage_menu" and not actions:
+                actions = []
+            return self.async_show_menu(step_id=section, menu_options=actions + ["overview_menu", "save"],
+                                        description_placeholders=summary)
+        return self.async_show_menu(step_id="init", menu_options=[
+            "building_menu", "hydraulics_menu", "rooms_menu", "sources_menu", "manage_menu", "all_actions", "save"
+        ], description_placeholders=summary)
+
+    async def async_step_overview_menu(self, user_input=None):
+        self._section = "overview"
+        return await self.async_step_init()
+
+    async def async_step_building_menu(self, user_input=None):
+        self._section = "building_menu"
+        return await self.async_step_init()
+
+    async def async_step_hydraulics_menu(self, user_input=None):
+        self._section = "hydraulics_menu"
+        return await self.async_step_init()
+
+    async def async_step_rooms_menu(self, user_input=None):
+        self._section = "rooms_menu"
+        return await self.async_step_init()
+
+    async def async_step_sources_menu(self, user_input=None):
+        self._section = "sources_menu"
+        return await self.async_step_init()
+
+    async def async_step_manage_menu(self, user_input=None):
+        self._section = "manage_menu"
+        return await self.async_step_init()
+
+    async def async_step_all_actions(self, user_input=None):
+        self._section = "all_actions"
+        return await self.async_step_init()
 
     async def _checkpoint(self):
         """Persist completed steps before showing the next page; no live options writes."""
@@ -233,7 +290,12 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
                             values[key] = None
                     self._topology = edit_item(self._topology, collection, original["id"], name, **values)
                 else:
-                    self._topology, _ = add_item(self._topology, collection, name, **values)
+                    self._topology, new_id = add_item(self._topology, collection, name, **values)
+                    if collection == "rooms" and getattr(self, "_section", "") == "rooms_menu":
+                        self._sensor_room = new_id
+                        if not await self._checkpoint():
+                            return self.async_abort(reason=self._draft_error)
+                        return await self.async_step_room_complete()
                 return await self.async_step_init()
             except TopologyError as exc:
                 errors["base"] = str(exc)
@@ -334,6 +396,52 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
                                     description_placeholders={"count": str(sum(map(len, candidates.values())))},
                                     errors=errors)
 
+    async def async_step_room_setup(self, user_input=None):
+        rooms = {r["id"]: r["name"] for r in self._topology["rooms"]}
+        if user_input is not None and user_input.get("room_id") in rooms:
+            self._sensor_room = user_input["room_id"]
+            return await self.async_step_room_complete()
+        return self.async_show_form(step_id="room_setup", data_schema=vol.Schema({
+            vol.Required("room_id"): self._native_selector(rooms),
+        }), errors={"base": "invalid_reference"} if user_input is not None else {})
+
+    async def async_step_room_complete(self, user_input=None):
+        from .room_setup import complete_room, room_candidates
+        room = next(r for r in self._topology["rooms"] if r["id"] == self._sensor_room)
+        entities = read_entities(self.hass)
+        candidates, preferred = room_candidates(self.hass, self._topology, room, entities)
+        existing = [c for c in self._topology["circuits"] if c.get("room_id") == room["id"]]
+        errors = {}
+        if user_input is not None:
+            try:
+                self._topology = complete_room(self._topology, room["id"], entities,
+                                                **user_input)
+                return await self.async_step_init()
+            except TopologyError as exc:
+                errors["base"] = str(exc)
+        fields = {}
+        if candidates["temperature"]:
+            fields[vol.Optional("temperatures")] = self._native_selector(
+                {k: f"{v} ({k})" for k,v in candidates["temperature"].items()}, multiple=True)
+        if candidates["humidity"]:
+            fields[vol.Optional("humidity")] = self._native_selector(
+                {k: f"{v} ({k})" for k,v in candidates["humidity"].items()})
+        fields[vol.Optional("manual_temperature")] = selector.EntitySelector(selector.EntitySelectorConfig(
+            filter=[{"domain": "sensor", "device_class": "temperature"}, {"domain": "climate"}]))
+        if self._topology["manifolds"]:
+            fields[vol.Optional("manifold_id")] = self._reference("manifolds")
+            fields[vol.Optional("count", default=0)] = selector.NumberSelector(selector.NumberSelectorConfig(
+                min=0, max=100, step=1, mode=selector.NumberSelectorMode.BOX))
+            fields[vol.Optional("positions")] = selector.TextSelector()
+        suggested = {"temperatures": preferred} if preferred else {}
+        if user_input:
+            suggested.update(user_input)
+        return self.async_show_form(step_id="room_complete",
+            data_schema=self.add_suggested_values_to_schema(vol.Schema(fields), suggested),
+            description_placeholders={"room": room["name"], "circuits": str(len(existing)),
+                "sensors": str(sum(b["room_id"] == room["id"] for b in self._topology["bindings"]))},
+            errors=errors)
+
     async def async_step_zone(self, user_input=None):
         return await self._add("zone", "zones", {
             vol.Required("operating_mode", default=self.config_entry.data.get("operating_mode", "unknown")):
@@ -369,6 +477,8 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
                 self._sensor_room = room_id
                 if not await self._checkpoint():
                     return self.async_abort(reason=self._draft_error)
+                if getattr(self, "_section", "") == "rooms_menu":
+                    return await self.async_step_room_complete()
                 return await self.async_step_confirm_sensors()
             except TopologyError as exc:
                 errors["base"] = str(exc)
