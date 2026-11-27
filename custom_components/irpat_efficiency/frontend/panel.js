@@ -9,6 +9,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
     this.loaded = false;
     this.busy = false;
     this.displayMode = 'heating';
+    this.viewMode = 'simple';
     this.historyHours = '24';
     this.timer = null;
     this.journalDrafts = new Map();
@@ -57,6 +58,16 @@ class IrpatEfficiencyPanel extends HTMLElement {
     if (text !== undefined) e.textContent = String(text);
     if (cls) e.className = cls;
     return e;
+  }
+
+  recordedFlow(entry, manifold, circuit) {
+    // Use the latest observation of this manifold, not a mixture of readings
+    // from different dates. Missing is unknown; zero is a measured value.
+    const records=(entry.journal||[]).filter(r=>r.manifold_id===manifold.id &&
+      Number.isFinite(Date.parse(r.timestamp)));
+    const latest=records.reduce((a,b)=>!a||Date.parse(b.timestamp)>=Date.parse(a.timestamp)?b:a,null);
+    const value=latest?.flows_lmin?.[circuit.id];
+    return {value:Number.isFinite(value)&&value>=0?value:null,timestamp:latest?.timestamp||null};
   }
 
   card(title, value) {
@@ -700,14 +711,15 @@ class IrpatEfficiencyPanel extends HTMLElement {
       .mode{display:flex;gap:8px;margin:16px 0}.mode button[aria-pressed="false"]{background:var(--secondary-background-color);color:var(--primary-text-color)}
       .label{overflow-wrap:anywhere}.room{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--divider-color)}
       .journal{margin:12px 0}.journal form{display:grid;gap:10px;padding:10px 0}.journal label{display:grid;gap:4px;overflow-wrap:anywhere}.journal input,.journal select,.journal textarea{width:100%;box-sizing:border-box;min-width:0;padding:8px;border:1px solid var(--divider-color);border-radius:6px;background:var(--card-background-color);color:var(--primary-text-color);font:inherit}.journal label[hidden]{display:none}.flow-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px}.journal-record{border-top:1px solid var(--divider-color);padding:8px 0}.journal-record small{display:block}.journal-record p{white-space:pre-wrap;overflow-wrap:anywhere}
-      @media(max-width:600px){main{padding:12px}}
+      .journal label:has(input[type="checkbox"]){display:flex;align-items:flex-start;gap:8px}.journal input[type="checkbox"]{width:18px;height:18px;flex:0 0 18px;accent-color:var(--primary-color)}.journal summary{cursor:pointer;padding:8px 0;overflow-wrap:anywhere}select:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}.mode{flex-wrap:wrap}.room>div{min-width:0}.loop small{display:block;overflow-wrap:anywhere}
+      @media(max-width:600px){main{padding:12px}.room{flex-wrap:wrap}.temperature{text-align:left}.journal button,.mode button{min-height:44px}}
     `;
     root.append(style);
     const main = this.node("main");
     const header = this.node("header");
     header.append(this.node("h1","irPaT & Eficiență"));
     const refresh = this.node("button",this.t("Actualizează","Refresh"));
-    refresh.disabled = this.busy;
+    refresh.disabled = this.busy || this.journalSaving;
     refresh.addEventListener("click",()=>this.refresh());
     header.append(refresh);
     main.append(header);
@@ -719,10 +731,22 @@ class IrpatEfficiencyPanel extends HTMLElement {
     for (const [key,ro,en] of [["heating","Încălzire","Heating"],["cooling","Răcire","Cooling"]]) {
       const button=this.node("button",this.t(ro,en));
       button.setAttribute("aria-pressed",String(this.displayMode===key));
-      button.addEventListener("click",()=>{this.displayMode=key;this.render();});
+      button.disabled=this.busy||this.journalSaving;
+      button.addEventListener("click",()=>{if(this.busy||this.journalSaving)return;this.displayMode=key;this.render();});
       modes.append(button);
     }
     main.append(modes,this.node("p",this.t("Modul selectat schimbă doar ținta afișată, nu regimul instalației.","Selected mode changes only the displayed target, not the equipment mode."),"muted"));
+    const view=this.node("div",undefined,"mode");
+    view.setAttribute("role","group");view.setAttribute("aria-label",this.t("Nivelul interfeței","Interface level"));
+    for(const [key,ro,en] of [["simple","Simplu","Simple"],["expert","Expert","Expert"]]){
+      const button=this.node("button",this.t(ro,en));button.type="button";
+      button.setAttribute("aria-pressed",String(this.viewMode===key));
+      button.disabled=this.busy||this.journalSaving;
+      button.addEventListener("click",()=>{if(this.busy||this.journalSaving)return;this.viewMode=key;this.render();});
+      view.append(button);
+    }
+    main.append(view);
+    if(this.viewMode==="simple")main.append(this.node("p",this.t("Modul Expert include profiluri, analize climatice, inerție, rapoarte și exporturi.","Expert mode includes profiles, climate analysis, inertia, reports and exports."),"muted"));
     if (this.busy) main.append(this.node("p",this.t("Se încarcă…","Loading…")));
     if (this.error) main.append(this.node("p",this.t("Nu s-a putut încărca configurația. Încearcă din nou.","Could not load configuration. Try again.")));
     if (!this.busy && !this.error && !this.entries.length) main.append(this.node("p",this.t("Nu există o configurație activă.","No active configuration.")));
@@ -734,12 +758,13 @@ class IrpatEfficiencyPanel extends HTMLElement {
       period.setAttribute("aria-label",this.t("Interval istoric","History interval"));
       for(const h of ["24","48","72","168"]){const option=this.node("option",h+" h");option.value=h;period.append(option);}
       period.value=this.historyHours;
-      period.addEventListener("change",()=>{this.historyHours=period.value;this.render();});
+      period.disabled=this.busy||this.journalSaving;
+      period.addEventListener("change",()=>{if(this.busy||this.journalSaving){period.value=this.historyHours;return;}this.historyHours=period.value;this.render();});
       const periodLabel=this.node("label",this.t("Interval statistic: ","Statistics interval: "));periodLabel.append(period);main.append(periodLabel);
       const grid = this.node("div",undefined,"grid");
       for (const [key,ro,en] of [["floors","Niveluri","Floors"],["rooms","Încăperi","Rooms"],["manifolds","Distribuitoare","Manifolds"],["circuits","Circuite","Circuits"],["zones","Zone","Zones"],["sources","Surse","Sources"]])
         grid.append(this.card(this.t(ro,en),(t[key]||[]).length));
-      main.append(grid,this.liveDiagnostics(entry),this.energyHistory(entry),this.defrostHistory(entry),this.thermalDiagnostics(entry),this.referenceProfiles(entry),this.weatherObservations(entry),this.inertiaReview(entry),this.modeHistory(entry),this.buildingReports(entry),this.exportData(entry));
+      main.append(grid,this.liveDiagnostics(entry),this.energyHistory(entry),this.thermalDiagnostics(entry));
       const rooms = new Map((t.rooms||[]).map(r=>[r.id,r]));
       for (const floor of t.floors||[]) {
         const section = this.node("section",undefined,"card");
@@ -796,15 +821,18 @@ class IrpatEfficiencyPanel extends HTMLElement {
             const loop = this.node("div",undefined,"loop");
             const label = this.node("strong",String(circuit.position));
             const meter = this.node("div",undefined,"meter");
-            meter.setAttribute("aria-label",this.t("Debit neînregistrat","Flow not recorded"));
-            loop.append(label,meter,this.node("div",undefined,"supply"),this.node("div",undefined,"pipe"),this.node("div",undefined,"return"),this.node("div",circuit.name,"label"),this.node("small",rooms.get(circuit.room_id)?.name||this.t("Neasociat","Unassigned"),"muted"),this.node("div","— l/min","muted"));
+            const reading=this.recordedFlow(entry,manifold,circuit);
+            const recorded=reading.value===null?this.t("Debit neînregistrat","Flow not recorded"):this.t("Debit manual înregistrat","Recorded manual flow");
+            meter.setAttribute("aria-label",recorded);
+            loop.append(label,meter,this.node("div",undefined,"supply"),this.node("div",undefined,"pipe"),this.node("div",undefined,"return"),this.node("div",circuit.name,"label"),this.node("small",rooms.get(circuit.room_id)?.name||this.t("Neasociat","Unassigned"),"muted"),this.node("div",reading.value===null?"— l/min":reading.value.toFixed(2)+" l/min","muted"),this.node("small",reading.timestamp?new Date(reading.timestamp).toLocaleString():"","muted"));
             loops.append(loop);
           }
           if (!circuits.length) section.append(this.node("p",this.t("Nu există circuite adăugate.","No circuits added."),"muted"));
-          section.append(loops,this.journalForm(entry,manifold,circuits));
+          section.append(this.node("small",this.t("Ultima observație manuală din jurnal, nu debit live. Lipsa unei citiri este afișată cu —.","Latest manual journal observation, not live flow. Missing readings are shown as —."),"muted"),loops,this.journalForm(entry,manifold,circuits));
         }
         main.append(section);
       }
+      if(this.viewMode==="expert")main.append(this.defrostHistory(entry),this.referenceProfiles(entry),this.weatherObservations(entry),this.inertiaReview(entry),this.modeHistory(entry),this.buildingReports(entry),this.exportData(entry));
     }
     main.append(this.node("p",this.t("Temperaturile sunt instantanee (media citirilor disponibile), cu toleranță provizorie ±0,3°C. Citirile expirate (peste 2 ore) sau cu timestamp în viitor sunt excluse. Istoricul local eșantionează la 5 minute, păstrează 8 zile și exclude rapoartele HA mai vechi de 2 ore; golurile rămân vizibile. Debitele se înregistrează manual în jurnal; nu sunt citiri live. Nu se transmit comenzi instalației.","Temperatures are snapshots (mean of available readings), with provisional ±0.3°C tolerance. Stale reports (over 2 hours old) and future timestamps are excluded. Local history samples every 5 minutes, retains 8 days and excludes HA reports older than 2 hours; gaps remain visible. Flows are recorded manually in the journal; they are not live readings. No commands are sent to equipment."),"muted"));
     root.append(main);
