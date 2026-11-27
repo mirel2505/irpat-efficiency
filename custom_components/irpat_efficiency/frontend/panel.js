@@ -171,6 +171,21 @@ class IrpatEfficiencyPanel extends HTMLElement {
     const names=new Map((entry.topology.rooms||[]).map(r=>[r.id,r.name]));
     for(const zone of zones){
       box.append(this.node("h3",zone.name),this.node("p",labels[zone.status]||zone.status));
+      const stable=zone.stability;
+      if(stable){
+        const progress=this.node("progress");
+        progress.max=stable.required_days;progress.value=stable.consecutive_days;
+        progress.setAttribute("aria-label",this.t("Zile consecutive în criterii","Consecutive days meeting criteria"));
+        const stateLabels={
+          stable_observed:this.t("Stabilitate termică observată","Observed thermal stability"),
+          criteria_not_met:this.t("Criteriile zilnice nu sunt îndeplinite","Daily criteria not met"),
+          collecting:this.t("Colectare pentru confirmare","Collecting for confirmation"),
+          settling:this.t("Stabilizare","Settling"),
+          monitor_only:this.t("Doar monitorizare","Monitoring only")
+        };
+        box.append(this.node("p",(stateLabels[stable.status]||stable.status)+" · "+stable.consecutive_days+"/"+stable.required_days+" "+this.t("zile","days")),progress);
+        box.append(this.node("small",this.t("Intervale consecutive de 24 h: acoperire comună ≥90%, minimum 95% dintre eșantioanele comune în toleranța ±0,3°C pentru fiecare cameră. Nu confirmă regimul real sau echilibrarea hidraulică.","Consecutive 24 h windows: ≥90% common coverage, at least 95% of common samples within ±0.3°C for each room. Does not confirm actual operating mode or hydraulic balance."),"muted"));
+      }
       if(zone.status==="observed"||zone.status==="insufficient_data")
         box.append(this.node("small",this.t("Acoperire comună: ","Common coverage: ")+Math.round(zone.coverage*100)+"%","muted"));
       if(zone.status==="observed"){
