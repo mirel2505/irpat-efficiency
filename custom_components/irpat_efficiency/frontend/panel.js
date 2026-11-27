@@ -538,6 +538,43 @@ class IrpatEfficiencyPanel extends HTMLElement {
     return box;
   }
 
+  fuelEconomics(entry) {
+    const history=entry.fuel_history||{}, econ=entry.economics||{}, sources=entry.topology.sources||[];
+    const box=this.node("section",undefined,"card");
+    if(!sources.some(s=>s.fuel||s.scenario_cop!=null)&&!(econ.comparisons||[]).length)return this.node("div");
+    box.append(this.node("h2",this.t("Combustibil și cost termic","Fuel and heat cost")));
+    if(entry.fuel_save_failed)box.append(this.node("p",this.t("Salvarea istoricului combustibilului a eșuat.","Fuel history save failed."),"status-warm"));
+    const periods={daily:this.t("Astăzi","Today"),weekly:this.t("Săptămâna curentă","This week"),monthly:this.t("Luna curentă","This month"),annual:this.t("Anul curent","This year")};
+    for(const s of sources){
+      const modeled=econ.modeled?.[s.id], rows=history[s.id];
+      if(!s.fuel&&!modeled)continue;
+      box.append(this.node("h3",s.name));
+      if(s.fuel)box.append(this.node("p",this.t("Tarif combustibil: ","Fuel tariff: ")+s.fuel.tariff+" "+s.fuel.currency+"/"+s.fuel.billing_unit+" · "+s.fuel.basis));
+      if(modeled)box.append(this.node("p",this.t("Scenariu estimat: ","Estimated scenario: ")+modeled.amount.toFixed(3)+" "+modeled.currency+"/kWh "+this.t("termic util","useful heat")+(modeled.complete?"":" · "+this.t("electricitate auxiliară necuantificată","auxiliary electricity unknown"))));
+      if(rows){
+        if(rows.daily?.status==="shared_meter"){box.append(this.node("p",this.t("Contor comun: atribuirea consumului este blocată.","Shared meter: consumption attribution blocked."),"status-warm"));continue;}
+        const grid=this.node("div",undefined,"grid");
+        for(const [key,label] of Object.entries(periods)){
+          const r=rows[key];if(!r)continue;
+          const card=this.card(label,r.fuel_kwh==null?"—":r.fuel_kwh.toFixed(2)+" kWh "+this.t("intrare","input"));
+          card.append(this.node("small",this.t("Acoperire: ","Coverage: ")+(r.coverage==null?"—":(100*r.coverage).toFixed(1)+"%"),"muted"));
+          if(r.current_tariff_cost){const c=r.current_tariff_cost;card.append(this.node("small",c.quantity.toFixed(3)+" "+c.unit+" · "+c.amount.toFixed(2)+" "+c.currency+" ("+this.t("tarif actual","current tariff")+")","muted"));}
+          grid.append(card);
+        }
+        box.append(grid);
+      }
+    }
+    for(const r of econ.comparisons||[]){
+      const hp=sources.find(s=>s.id===r.heat_pump_id),fuel=sources.find(s=>s.id===r.fuel_source_id);
+      box.append(this.node("p",(hp?.name||"")+" / "+(fuel?.name||"")+" · "+this.t("COP de egalitate economică: ","Break-even COP: ")+r.break_even_cop.toFixed(2)));
+    }
+    for(const z of entry.topology.zones||[]){
+      if(z.source_strategy)box.append(this.node("small",z.name+" · "+this.t("Strategie declarată: ","Declared strategy: ")+z.source_strategy+(z.declared_switch_c==null?"":" · "+z.declared_switch_c+" °C"),"muted"));
+    }
+    box.append(this.node("p",this.t("Costurile combustibilului și electricității sunt separate, nu totaluri de factură. Scenariile nu reprezintă măsurători ale randamentului. COP-ul de egalitate nu este temperatura de comutare; integrarea nu comandă sursele.","Fuel and electricity costs are separate, not bill totals. Scenarios are not efficiency measurements. Break-even COP is not a switching temperature; the integration does not control sources."),"muted"));
+    return box;
+  }
+
   exportData(entry) {
     const box=this.node("details",undefined,"card journal");
     box.append(this.node("summary",this.t("Export date","Export data")));
@@ -546,7 +583,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
     const select=this.node("select");
     for(const [value,ro,en] of [
       ["json","Arhivă JSON","JSON archive"],["temperatures","Temperaturi CSV","Temperatures CSV"],
-      ["energy","Energie CSV","Energy CSV"],["hydraulics","Debite CSV","Hydraulics CSV"],
+      ["energy","Energie CSV","Energy CSV"],["fuel","Combustibil CSV","Fuel CSV"],["hydraulics","Debite CSV","Hydraulics CSV"],
       ["profiles","Profiluri CSV","Profiles CSV"],["observations","Observații CSV","Observations CSV"],
       ["comparisons","Comparații CSV","Comparisons CSV"],["defrost","Degivrări CSV","Defrost CSV"],
       ["modes","Regimuri CSV","Modes CSV"]
@@ -764,7 +801,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       const grid = this.node("div",undefined,"grid");
       for (const [key,ro,en] of [["floors","Niveluri","Floors"],["rooms","Încăperi","Rooms"],["manifolds","Distribuitoare","Manifolds"],["circuits","Circuite","Circuits"],["zones","Zone","Zones"],["sources","Surse","Sources"]])
         grid.append(this.card(this.t(ro,en),(t[key]||[]).length));
-      main.append(grid,this.liveDiagnostics(entry),this.energyHistory(entry),this.thermalDiagnostics(entry));
+      main.append(grid,this.liveDiagnostics(entry),this.energyHistory(entry),this.fuelEconomics(entry),this.thermalDiagnostics(entry));
       const rooms = new Map((t.rooms||[]).map(r=>[r.id,r]));
       for (const floor of t.floors||[]) {
         const section = this.node("section",undefined,"card");
