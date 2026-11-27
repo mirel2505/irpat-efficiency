@@ -1,6 +1,7 @@
 """Local, advisory-only radiant floor system integration."""
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from .const import DOMAIN
@@ -9,9 +10,21 @@ if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
 
+_LOGGER = logging.getLogger(__name__)
+# Registration keys are also consumed by the administrator overview API.
+_COMPONENTS = (
+    ("report_stores", "async_load", "async_close"),
+    ("journals", "async_load", "async_close"),
+    ("profiles", "async_load", "async_close"),
+    ("histories", "async_start", "async_stop"),
+    ("defrost_monitors", "async_start", "async_stop"),
+    ("energy_monitors", "async_start", "async_stop"),
+    ("mode_monitors", "async_start", "async_stop"),
+)
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Initialize the local overview; no equipment calls."""
+    """Start components in order and unwind partially initialized resources."""
     from . import panel
     from .history_store import RoomHistory
     from .journal_store import HydraulicJournal
@@ -22,68 +35,80 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .report_store import ReportStore
     from homeassistant.helpers.storage import Store
 
-    runtime = hass.data.setdefault(DOMAIN, {"active_entries": set(), "histories": {}, "journals": {}, "profiles": {}, "defrost_monitors": {}, "energy_monitors": {}, "mode_monitors": {}, "report_stores": {}})
-    reports = ReportStore(Store(hass, 1, f"{DOMAIN}.reports.{entry.entry_id}"))
-    await reports.async_load()
-    journal = HydraulicJournal(Store(hass, 1, f"{DOMAIN}.journal.{entry.entry_id}"))
-    await journal.async_load()
-    profiles = ProfileStore(Store(hass, 1, f"{DOMAIN}.profiles.{entry.entry_id}"))
-    await profiles.async_load()
-    history = RoomHistory(hass, entry)
-    await history.async_start()
-    monitor = DefrostMonitor(hass, entry)
-    energy = EnergyMonitor(hass, entry)
-    modes = ModeMonitor(hass, entry)
+    runtime = hass.data.setdefault(DOMAIN, {})
+    active = runtime.setdefault("active_entries", set())
+    starting = runtime.setdefault("starting_entries", set())
+    eid = entry.entry_id
+    for key, _, _ in _COMPONENTS:
+        runtime.setdefault(key, {})
+    if eid in active or eid in starting or any(eid in runtime[k] for k, _, _ in _COMPONENTS):
+        _LOGGER.warning("Entry already initialized or awaiting cleanup: %s", eid)
+        return False
+    factories = (
+        lambda: ReportStore(Store(hass, 1, f"{DOMAIN}.reports.{eid}")),
+        lambda: HydraulicJournal(Store(hass, 1, f"{DOMAIN}.journal.{eid}")),
+        lambda: ProfileStore(Store(hass, 1, f"{DOMAIN}.profiles.{eid}")),
+        lambda: RoomHistory(hass, entry),
+        lambda: DefrostMonitor(hass, entry),
+        lambda: EnergyMonitor(hass, entry),
+        lambda: ModeMonitor(hass, entry),
+    )
+    created = []
+    starting.add(eid)
     try:
-        await monitor.async_start()
-        await energy.async_start()
-        await modes.async_start()
+        for (key, start, stop), factory in zip(_COMPONENTS, factories, strict=True):
+            component = factory()
+            created.append((key, stop, component))
+            await getattr(component, start)()
         await panel.async_register(hass)
-    except Exception:
-        await modes.async_stop()
-        await energy.async_stop()
-        await monitor.async_stop()
-        await history.async_stop()
+        for key, _, component in created:
+            runtime[key][eid] = component
+        active.add(eid)
+        return True
+    except BaseException:
+        for key, stop, component in reversed(created):
+            try:
+                await getattr(component, stop)()
+            except Exception:
+                # Keep a failed resource reachable for a subsequent unload attempt.
+                runtime[key][eid] = component
+                _LOGGER.exception("Could not roll back %s", key)
         raise
-    runtime["report_stores"][entry.entry_id] = reports
-    runtime["mode_monitors"][entry.entry_id] = modes
-    runtime["energy_monitors"][entry.entry_id] = energy
-    runtime["defrost_monitors"][entry.entry_id] = monitor
-    runtime["profiles"][entry.entry_id] = profiles
-    runtime["journals"][entry.entry_id] = journal
-    runtime["histories"][entry.entry_id] = history
-    runtime["active_entries"].add(entry.entry_id)
-    return True
+    finally:
+        starting.discard(eid)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Remove the overview when the last entry is unloaded."""
+    """Stop every component; retain failed resources for retry."""
     from . import panel
 
     runtime = hass.data.get(DOMAIN)
-    if runtime:
-        reports = runtime["report_stores"].pop(entry.entry_id, None)
-        if reports is not None:
-            await reports.async_close()
-        modes = runtime["mode_monitors"].pop(entry.entry_id, None)
-        if modes is not None:
-            await modes.async_stop()
-        energy = runtime["energy_monitors"].pop(entry.entry_id, None)
-        if energy is not None:
-            await energy.async_stop()
-        monitor = runtime["defrost_monitors"].pop(entry.entry_id, None)
-        if monitor is not None:
-            await monitor.async_stop()
-        profiles = runtime["profiles"].pop(entry.entry_id, None)
-        if profiles is not None:
-            await profiles.async_close()
-        journal = runtime["journals"].pop(entry.entry_id, None)
-        if journal is not None:
-            await journal.async_close()
-        history = runtime["histories"].pop(entry.entry_id, None)
-        if history is not None:
-            await history.async_stop()
-        runtime["active_entries"].discard(entry.entry_id)
-        if not runtime["active_entries"]:
+    if not runtime:
+        return True
+    eid = entry.entry_id
+    if eid in runtime.get("starting_entries", set()):
+        return False
+    failed = False
+    for key, _, stop in reversed(_COMPONENTS):
+        resources = runtime.get(key, {})
+        component = resources.get(eid)
+        if component is None:
+            continue
+        try:
+            await getattr(component, stop)()
+        except Exception:
+            failed = True
+            _LOGGER.exception("Could not stop %s", key)
+        else:
+            resources.pop(eid, None)
+    if failed:
+        return False
+    active = runtime.get("active_entries", set())
+    active.discard(eid)
+    if not active:
+        try:
             panel.async_remove(hass)
+        except Exception:
+            _LOGGER.exception("Could not remove irPaT panel")
+            return False
     return True
