@@ -608,7 +608,7 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
         errors = {}
         if user_input is not None:
             entity = user_input.get("entity_id")
-            if entity and (not isinstance(entity, str) or not entity.startswith("sensor.")):
+            if entity and (not isinstance(entity, str) or not entity.startswith(("sensor.", "weather."))):
                 errors["base"] = "invalid_entity"
             elif entity and any(b["entity_id"] == entity for b in self._topology["bindings"]):
                 errors["base"] = "duplicate_entity"
@@ -620,7 +620,7 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
                 return await self.async_step_init()
         return self.async_show_form(step_id="outdoor", data_schema=vol.Schema({
             vol.Optional("entity_id"): selector.EntitySelector(selector.EntitySelectorConfig(
-                filter=[{"domain": "sensor", "device_class": "temperature"}])),
+                filter=[{"domain": "sensor", "device_class": "temperature"}, {"domain": "weather"}])),
         }), errors=errors)
 
     async def _telemetry(self, group, user_input):

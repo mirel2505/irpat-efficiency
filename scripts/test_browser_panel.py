@@ -98,6 +98,9 @@ def run_case(browser, language, width, dark):
     panel = page.locator("irpat-efficiency-panel")
     expect(panel.get_by_role("heading", name="Test installation", exact=True)).to_be_visible()
     expect(panel.get_by_text("21.5 °C", exact=True)).to_be_visible()
+    expect(panel.get_by_role("heading", name=word("Echilibrul casei","Home comfort"), exact=True)).to_be_visible()
+    expect(panel.get_by_role("heading", name=word("Următorul pas","Next step"), exact=True)).to_be_visible()
+    expect(panel.get_by_text(word("Setează ținta pentru toate camerele","Set a target for all rooms"), exact=True)).to_be_visible()
     expect(panel.locator(".loop").get_by_text("0.00 l/min", exact=True)).to_be_visible()
     expect(panel.get_by_text("Bedroom <script>not markup</script>", exact=True).first).to_be_visible()
     assert panel.locator("script").count() == 0

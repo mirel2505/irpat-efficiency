@@ -39,7 +39,7 @@ async def test_graphical_configuration(hass, hass_ws_client, enable_custom_integ
         state = result["result"]
         return state["topology"]
     initial_revision = state["revision"]
-    t = await action("import")
+    t = await action("import", single_floor=True, single_native_floor=floor.floor_id, area_ids=[area.id])
     room = t["rooms"][0]["id"]
     assert t["bindings"][0]["entity_id"] == sensor.entity_id
     assert state["room_temperatures"][room]["heating"]["temperature_c"] == 21.5
@@ -54,7 +54,8 @@ async def test_graphical_configuration(hass, hass_ws_client, enable_custom_integ
     assert not result["success"] and result["error"]["code"] == "configuration_changed"
     result = await call("configuration_action", revision=state["revision"], action="remove", payload={"collection":"rooms","id":room,"confirmed":True})
     assert not result["success"] and result["error"]["code"] == "object_in_use"
-    await client.send_json({"id":seq+1,"type":f"{DOMAIN}/overview"})
+    seq += 1
+    await client.send_json({"id":seq,"type":f"{DOMAIN}/overview"})
     result = await client.receive_json()
     assert result["success"], result
     assert result["result"][0]["topology"] == t
@@ -71,7 +72,7 @@ async def test_graphical_configuration(hass, hass_ws_client, enable_custom_integ
     t = await action("outdoor", entity_id="weather.test")
     assert t["outdoor_entity_id"] == "weather.test"
     seq += 1
-    await client.send_json({"id":seq+1,"type":f"{DOMAIN}/overview"})
+    await client.send_json({"id":seq,"type":f"{DOMAIN}/overview"})
     result = await client.receive_json()
     assert result["success"], result
     assert result["result"][0]["outdoor"]["reading"]["temperature_c"] == 7
