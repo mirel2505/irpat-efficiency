@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import asyncio
+import logging
 
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.helpers import selector
+from homeassistant.helpers.storage import Store
 
-from .const import OPERATING_MODES, CIRCUIT_CONTROLS
+from .const import DOMAIN, OPERATING_MODES, CIRCUIT_CONTROLS
 from .topology import SOURCE_TYPES, TopologyError, add_item, empty_topology
 from .topology_edit import EDIT_FIELDS, OPTIONAL_FIELDS, edit_item
 from .topology_remove import remove_item
@@ -16,6 +19,9 @@ from .source_settings import FLUID_TYPES, set_source_settings
 from .operation_mode import MODES, configure_mode
 from .ha_registry_reader import read_structure, read_entities
 from .registry_import import import_floor, import_room, import_all, sensor_candidates, confirm_sensors
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _choices(values, translation_key):
@@ -31,7 +37,25 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
         """Open the configuration menu."""
         if not hasattr(self, "_topology"):
-            self._topology = deepcopy(self.config_entry.options.get("topology", empty_topology()))
+            self._base = deepcopy(self.config_entry.options.get("topology", empty_topology()))
+            self._topology = deepcopy(self._base)
+            self._draft_store = Store(self.hass, 1, f"{DOMAIN}.configuration_draft.{self.config_entry.entry_id}")
+            locks = self.hass.data.setdefault(DOMAIN, {}).setdefault("draft_locks", {})
+            self._draft_lock = locks.setdefault(self.config_entry.entry_id, asyncio.Lock())
+            async with self._draft_lock:
+                try:
+                    self._last_draft = await self._draft_store.async_load()
+                except Exception:
+                    _LOGGER.exception("Could not read configuration draft")
+                    return self.async_abort(reason="draft_read_failed")
+                draft = self._last_draft
+                if isinstance(draft, dict) and draft.get("base") == self._base:
+                    candidate = draft.get("topology")
+                    if (isinstance(candidate, dict) and candidate.get("schema_version") == self._base.get("schema_version")
+                            and all(isinstance(candidate.get(k), list) for k in EDIT_FIELDS)):
+                        self._topology = deepcopy(candidate)
+        if not await self._checkpoint():
+            return self.async_abort(reason=self._draft_error)
         self._editing = None
         t = self._topology
         menu = ["floor", "zone", "outdoor"]
@@ -59,8 +83,54 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
         if any(t[group] for group in EDIT_FIELDS):
             menu.append("edit")
             menu.append("remove")
+        if self._topology != self._base:
+            menu.append("discard_draft")
         menu.append("save")
-        return self.async_show_menu(step_id="init", menu_options=menu)
+        return self.async_show_menu(step_id="init", menu_options=menu,
+                                    description_placeholders={"draft": str(self._topology != self._base)})
+
+    async def _checkpoint(self):
+        """Persist completed steps before showing the next page; no live options writes."""
+        async with self._draft_lock:
+            current = self.config_entry.options.get("topology", empty_topology())
+            if current != self._base:
+                self._draft_error = "draft_conflict"
+                return False
+            try:
+                latest = await self._draft_store.async_load()
+                if latest != self._last_draft:
+                    self._draft_error = "draft_conflict"
+                    return False
+                desired = {"base": deepcopy(self._base), "topology": deepcopy(self._topology)}
+                if desired != latest and (self._topology != self._base or isinstance(latest, dict) and latest.get("base") == self._base):
+                    await self._draft_store.async_save(desired)
+                    self._last_draft = desired
+                return True
+            except Exception:
+                _LOGGER.exception("Could not checkpoint configuration draft")
+                self._draft_error = "draft_write_failed"
+                return False
+
+    async def async_step_discard_draft(self, user_input=None):
+        errors = {}
+        if user_input is not None:
+            if user_input.get("confirmed") is True:
+                async with self._draft_lock:
+                    try:
+                        if (self.config_entry.options.get("topology", empty_topology()) != self._base
+                                or await self._draft_store.async_load() != self._last_draft):
+                            return self.async_abort(reason="draft_conflict")
+                        await self._draft_store.async_remove()
+                        self._last_draft = None
+                    except Exception:
+                        _LOGGER.exception("Could not discard configuration draft")
+                        return self.async_abort(reason="draft_write_failed")
+                    self._topology = deepcopy(self._base)
+                return await self.async_step_init()
+            errors["base"] = "registry_confirmation_required"
+        return self.async_show_form(step_id="discard_draft", data_schema=vol.Schema({
+            vol.Required("confirmed", default=False): selector.BooleanSelector(),
+        }), errors=errors)
 
     def _reference(self, collection, multiple=False):
         return selector.SelectSelector(selector.SelectSelectorConfig(
@@ -290,6 +360,8 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
                            if user_input.get(k) is not None}
                 self._topology = edit_item(updated, "rooms", room_id, room["name"], **changes)
                 self._sensor_room = room_id
+                if not await self._checkpoint():
+                    return self.async_abort(reason=self._draft_error)
                 return await self.async_step_confirm_sensors()
             except TopologyError as exc:
                 errors["base"] = str(exc)
@@ -429,11 +501,13 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
             ("cp_j_kgk", 1, 10000, 1, "J/(kg·K)"),
             ("tariff", 0, 100000, 0.001, None),
         ):
-            fields[vol.Optional(key)] = selector.NumberSelector(selector.NumberSelectorConfig(
-                min=minimum, max=maximum, step=step, mode=selector.NumberSelectorMode.BOX,
-                unit_of_measurement=unit))
+            config = dict(min=minimum, max=maximum, step=step, mode=selector.NumberSelectorMode.BOX)
+            if unit is not None:
+                config["unit_of_measurement"] = unit
+            fields[vol.Optional(key)] = selector.NumberSelector(selector.NumberSelectorConfig(**config))
         fields[vol.Optional("currency")] = selector.TextSelector()
-        schema = self.add_suggested_values_to_schema(vol.Schema(fields), source)
+        suggested = {key: value for key, value in source.items() if value is not None}
+        schema = self.add_suggested_values_to_schema(vol.Schema(fields), suggested)
         return self.async_show_form(step_id="source_properties", data_schema=schema, errors=errors)
 
     async def async_step_mode_source(self, user_input=None):
@@ -469,6 +543,10 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_form(step_id="mode_mapping", data_schema=schema, errors=errors)
 
     async def async_step_save(self, user_input=None):
+        if not await self._checkpoint():
+            return self.async_abort(reason=self._draft_error)
+        # Keep the durable draft until Core commits the options; on the next
+        # session a draft whose base differs from saved options is ignored.
         return self.async_create_entry(title="", data={
             **self.config_entry.options, "topology": self._topology,
         })
