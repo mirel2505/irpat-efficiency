@@ -85,6 +85,45 @@
         "circuits": "Circuite",
         "bindings": "Senzori de temperatură ai camerelor"
       }
+    },
+    "fuel_kind": {
+      "options": {
+        "natural_gas": "Gaz natural",
+        "lpg": "GPL / propan",
+        "pellets": "Peleți",
+        "wood": "Lemne",
+        "district_heat": "Termoficare",
+        "other": "Alt combustibil"
+      }
+    },
+    "fuel_basis": {
+      "options": {
+        "HHV": "Putere calorifică superioară (PCS)",
+        "LHV": "Putere calorifică inferioară (PCI)",
+        "delivered_heat": "Căldură livrată"
+      }
+    },
+    "fuel_unit": {
+      "options": {
+        "kWh": "kWh",
+        "MWh": "MWh",
+        "Gcal": "Gcal",
+        "m3": "m³",
+        "L": "Litru",
+        "kg": "kg",
+        "t": "Tonă",
+        "cylinder": "Butelie",
+        "bag": "Sac"
+      }
+    },
+    "source_strategy": {
+      "options": {
+        "unknown": "Necunoscut",
+        "alternate": "Alternativ",
+        "parallel": "Paralel",
+        "cascade": "Cascadă",
+        "manual": "Manual"
+      }
     }
   },
   "options": {
@@ -111,7 +150,9 @@
           "remove": "Elimină un element din configurație",
           "import_structure": "Importă nivelurile și încăperile Home Assistant",
           "discover_sensors": "Detectează senzorii încăperii",
-          "discard_draft": "Renunță la ciornă (păstrează configurația salvată)"
+          "discard_draft": "Renunță la ciornă (păstrează configurația salvată)",
+          "economic_source": "Combustibil și scenarii economice",
+          "hybrid_zone": "Strategie sistem hibrid"
         }
       },
       "floor": {
@@ -348,6 +389,50 @@
         "data": {
           "confirmed": "Confirm renunțarea"
         }
+      },
+      "economic_source": {
+        "title": "Alege sursa pentru analiza economică",
+        "data": {
+          "source_id": "Sursă termică"
+        }
+      },
+      "electric_scenario": {
+        "title": "Scenariu încălzire electrică",
+        "description": "Tariful electric se configurează în Proprietăți sursă. Introdu COP-ul de încălzire analizat (sau randamentul sursei electrice ca raport). Nu este COP măsurat automat. Lasă gol pentru a elimina scenariul.",
+        "data": {
+          "cop": "COP analizat / raport căldură utilă–electricitate"
+        }
+      },
+      "fuel_properties": {
+        "title": "Facturare și conversie combustibil",
+        "description": "Folosește aceeași bază PCS/PCI pentru conversii și randament. Factorii kWh și MWh sunt automați; celelalte unități necesită kWh/unitate verificați. Contorul trebuie să fie cumulativ și să aibă unitatea aleasă. Electricitatea auxiliară folosește tariful electric separat. Câmpul auxiliar gol înseamnă necunoscut, nu zero. Estimările la tariful actual nu sunt facturi.",
+        "data": {
+          "kind": "Tip combustibil",
+          "basis": "Bază energetică",
+          "billing_unit": "Unitate facturare",
+          "tariff": "Preț pe unitate facturată",
+          "fuel_currency": "Monedă (cod ISO)",
+          "billing_kwh_per_unit": "Energie per unitate facturată",
+          "meter_entity": "Contor cumulativ combustibil (opțional)",
+          "meter_unit": "Unitate contor",
+          "meter_kwh_per_unit": "Energie per unitate contor",
+          "efficiency_percent": "Randament termic util analizat",
+          "auxiliary_kwh_per_heat_kwh": "Electricitate auxiliară per kWh termic util"
+        }
+      },
+      "hybrid_zone": {
+        "title": "Alege zona hidraulică comună",
+        "data": {
+          "zone_id": "Zonă hidraulică"
+        }
+      },
+      "hybrid_policy": {
+        "title": "Strategie de funcționare declarată",
+        "description": "Doar documentare și analiză consultativă. Pragul exterior este cel declarat de tine, nu o comandă sau temperatura economică determinată automat. Regimul efectiv este citit separat.",
+        "data": {
+          "strategy": "Strategie",
+          "threshold_c": "Prag exterior declarat de comutare"
+        }
       }
     },
     "error": {
@@ -372,7 +457,11 @@
       "remove_confirmation_required": "Este necesară confirmarea explicită.",
       "registry_conflict": "Asociere locală ambiguă. Redenumește elementele locale aflate în conflict înainte de import.",
       "registry_floor_required": "Încăperea nu are nivel asociat. Adaugă întâi un nivel local sau alege unul de rezervă.",
-      "registry_confirmation_required": "Confirmă explicit importul."
+      "registry_confirmation_required": "Confirmă explicit importul.",
+      "invalid_fuel_unit": "Alege o unitate acceptată.",
+      "invalid_fuel_factor": "Introdu un factor energetic verificat și coerent pentru unitate.",
+      "invalid_fuel_basis": "Alege baza energetică validă pentru combustibil.",
+      "invalid_fuel_efficiency": "Verifică randamentul și baza PCS/PCI."
     },
     "abort": {
       "draft_conflict": "Configurația sau ciorna s-a schimbat în altă sesiune. Redeschide Configure pentru ultima ciornă.",
