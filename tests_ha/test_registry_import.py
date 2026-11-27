@@ -29,6 +29,7 @@ async def test_native_registry_import(hass, enable_custom_integrations):
     await hass.async_block_till_done()
     manager = hass.config_entries.options
     result = await manager.async_init(entry.entry_id)
+    result = await manager.async_configure(result["flow_id"], {"next_step_id": "all_actions"})
     flow_id = result["flow_id"]
     assert "import_structure" in result["menu_options"]
     result = await manager.async_configure(flow_id, {"next_step_id": "import_structure"})
@@ -64,6 +65,7 @@ async def test_native_room_selection_and_sensor_confirmation(hass, enable_custom
     registry.async_update_entity(sensor.entity_id, area_id=area.id)
     manager = hass.config_entries.options
     result = await manager.async_init(entry.entry_id)
+    result = await manager.async_configure(result["flow_id"], {"next_step_id": "all_actions"})
     fid = result["flow_id"]
     result = await manager.async_configure(fid, {"next_step_id": "room"})
     assert "room_existing" in result["menu_options"]
