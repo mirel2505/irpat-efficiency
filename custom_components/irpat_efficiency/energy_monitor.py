@@ -1,13 +1,13 @@
 """Read-only optional electricity meter collection."""
-from datetime import timedelta
 import logging
 
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.event import async_track_utc_time_change
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .energy_store import EnergyStore
+from .mode_history import observation
 from .source_settings import estimate_cost
 from .telemetry_reader import read_telemetry
 from .topology import empty_topology
@@ -32,15 +32,34 @@ class EnergyMonitor:
 
     async def async_start(self):
         await self.history.async_load()
-        self.cancel = async_track_time_interval(
-            self.hass, self.async_sample, timedelta(minutes=5))
+        self.cancel = async_track_utc_time_change(
+            self.hass, self.async_sample, minute=range(0, 60, 5), second=0)
 
     async def async_sample(self, now):
         topology = self.entry.options.get("topology", empty_topology())
         tz = dt_util.get_time_zone(self.hass.config.time_zone)
         if tz is None:
             return
-        samples = self.meter_samples(topology, read_telemetry(self.hass, topology))
+        telemetry = read_telemetry(self.hass, topology)
+        samples = self.meter_samples(topology, telemetry)
+        thermal = {s["owner_id"]: s for s in telemetry
+                   if s["group"] == "sources" and s["role"] == "thermal_power"}
+        for source in topology["sources"]:
+            sid = source["id"]
+            binding = source.get("mode_binding")
+            if sid not in samples or not binding or source.get("source_type") != "heat_pump":
+                continue
+            state = self.hass.states.get(binding["entity_id"])
+            mode = None
+            if state is not None:
+                reported = getattr(state, "last_reported", None) or state.last_updated
+                mode = observation(binding, state.state, state.last_changed.timestamp(),
+                                   reported.timestamp(), dt_util.utcnow().timestamp())
+            samples[sid]["pair"] = {
+                "confirmed": source.get("power_boundary_confirmed") is True
+                             and source.get("energy_boundary_confirmed") is True,
+                "thermal": thermal.get(sid), "mode": mode,
+            }
         try:
             await self.history.async_sample(samples, dt_util.utcnow().timestamp(), tz)
             self.save_failed = False
