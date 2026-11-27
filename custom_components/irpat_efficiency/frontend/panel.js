@@ -384,11 +384,22 @@ class IrpatEfficiencyPanel extends HTMLElement {
           const c=row.current_tariff_cost;
           card.append(this.node("small",this.t("Estimare la tariful actual: ","Estimate at current tariff: ")+c.amount.toFixed(2)+" "+c.currency,"muted"));
         }
+        if(source.source_type==="heat_pump"){
+          for(const mode of ["heating","cooling"]){
+            const m=row.modes?.[mode];
+            if(!m||!m.seconds)continue;
+            const label=mode==="heating"?this.t("Încălzire","Heating"):this.t("Răcire","Cooling");
+            const ratio=m.cop==null?"—":m.cop.toFixed(2);
+            card.append(this.node("small",label+" · "+this.t("Raport parțial Q/E: ","Partial Q/E ratio: ")+ratio,"muted"),
+              this.node("small",this.t("Energie termică estimată / electrică asociată: ","Estimated heat / matched electricity: ")+m.thermal_kwh.toFixed(2)+" / "+m.electric_kwh.toFixed(2)+" kWh","muted"),
+              this.node("small",this.t("Acoperire din perioada calendaristică: ","Share of calendar period: ")+(100*m.coverage).toFixed(1)+"%","muted"));
+          }
+        }
         grid.append(card);
       }
       box.append(grid);
     }
-    box.append(this.node("p",this.t("Doar consumul observat din contorul configurat. Golurile nu sunt estimate. Totalurile folosesc calendarul local și alocarea aproximativă la intervale de 5 minute; după schimbarea contorului se afișează segmentul curent. COP pe perioadă necesită confirmarea regimului și a limitelor de măsurare.","Only observed consumption from the configured meter. Gaps are not estimated. Totals use local calendar dates and approximate five-minute allocation; after meter replacement the current segment is shown. Period COP requires confirmed mode and measurement boundaries."),"muted"));
+    box.append(this.node("p",this.t("Doar consumul observat din contorul configurat. Golurile nu sunt estimate. Totalurile folosesc calendarul local și alocarea aproximativă la intervale de 5 minute; după schimbarea contorului se afișează segmentul curent. Raportul Q/E folosește numai intervalele asociate și căldura estimată din puterea termică. Exclude ACM, standby, tranzițiile și degivrarea raportată separat; nu reprezintă COP-ul integral al perioadei.","Only observed consumption from the configured meter. Gaps are not estimated. Totals use local calendar dates and approximate five-minute allocation; after meter replacement the current segment is shown. The Q/E ratio uses matched intervals and heat estimated from thermal power. DHW, standby, transitions and separately reported defrost are excluded; this is not the full-period COP."),"muted"));
     return box;
   }
 
