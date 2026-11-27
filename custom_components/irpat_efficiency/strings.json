@@ -81,7 +81,7 @@
         "zones": "Hydraulic zones",
         "sources": "Heat sources",
         "rooms": "Rooms",
-        "manifolds": "Manifolds",
+        "manifolds": "Distributors (manifolds)",
         "circuits": "Circuits",
         "bindings": "Room temperature sensors"
       }
@@ -130,29 +130,37 @@
     "step": {
       "init": {
         "title": "System configuration",
-        "description": "Add floors and zones, then rooms, manifolds, circuits and sensors. Completed steps are stored as a local draft; reopening this menu resumes it. Select Save configuration to apply changes.",
+        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nUnapplied draft: {pending} (1 = yes, 0 = no). Completed steps are saved locally. Select Save configuration to apply.",
         "menu_options": {
           "floor": "Add or select floor",
-          "zone": "Add hydraulic zone",
+          "zone": "Add hydraulic zone (shared water-temperature regime)",
           "room": "Add or select room",
           "source": "Add heat source",
-          "manifold": "Add manifold",
+          "manifold": "Add distributor (manifold)",
           "circuit": "Add circuit",
           "binding": "Add room sensor",
           "save": "Save configuration",
           "outdoor": "Configure outdoor sensor",
           "telemetry_rooms": "Room sensors",
           "telemetry_sources": "Heat source sensors",
-          "telemetry_manifolds": "Manifold sensors",
+          "telemetry_manifolds": "Distributor sensors",
           "source_settings": "Source properties and tariff",
           "mode_source": "Reported source mode",
           "edit": "Edit existing configuration",
-          "remove": "Remove configuration object",
+          "remove": "Remove one or more objects",
           "import_structure": "Import Home Assistant floors and areas",
           "discover_sensors": "Discover room sensors",
           "discard_draft": "Discard draft (keep saved configuration)",
           "economic_source": "Fuel and economic scenarios",
-          "hybrid_zone": "Hybrid operating strategy"
+          "hybrid_zone": "Hybrid operating strategy",
+          "building_menu": "1. Building and outdoor temperature",
+          "hydraulics_menu": "2. Heating circuits and distributors",
+          "rooms_menu": "3. Rooms and sensors",
+          "sources_menu": "4. Heat sources and costs",
+          "manage_menu": "5. Edit or remove",
+          "all_actions": "Expert – all configuration actions",
+          "overview_menu": "Back to configuration overview",
+          "room_setup": "Complete existing room (sensors and circuits)"
         }
       },
       "floor": {
@@ -186,7 +194,7 @@
         }
       },
       "manifold": {
-        "title": "Add manifold",
+        "title": "Add distributor (manifold)",
         "data": {
           "name": "Custom name",
           "floor_id": "Floor",
@@ -197,7 +205,7 @@
         "title": "Add circuit",
         "data": {
           "name": "Custom name",
-          "manifold_id": "Manifold",
+          "manifold_id": "Distributor",
           "position": "Position from left to right",
           "length_m": "Circuit length",
           "room_id": "Room"
@@ -320,11 +328,9 @@
         }
       },
       "remove_item": {
-        "title": "Confirm removal",
-        "description": "This removes only the configuration object and its own telemetry associations. Dependent objects must be removed separately. Stored history is not explicitly erased; normal retention still applies. Changes apply only after Save configuration.",
+        "title": "Select objects to remove",
         "data": {
-          "item_id": "Object",
-          "confirmed": "Confirm removal from configuration"
+          "item_ids": "Objects"
         }
       },
       "floor_custom": {
@@ -432,6 +438,126 @@
         "data": {
           "strategy": "Strategy",
           "threshold_c": "Declared outdoor switch threshold"
+        }
+      },
+      "building_menu": {
+        "title": "1. Building and outdoor temperature",
+        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nUnapplied draft: {pending} (1 = yes, 0 = no). Completed steps are saved locally. Select Save configuration to apply.",
+        "menu_options": {
+          "floor": "Add or select floor",
+          "import_structure": "Import Home Assistant floors and areas",
+          "outdoor": "Configure outdoor sensor",
+          "overview_menu": "Back to configuration overview",
+          "save": "Save configuration"
+        }
+      },
+      "hydraulics_menu": {
+        "title": "2. Heating circuits and distributors",
+        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nUnapplied draft: {pending} (1 = yes, 0 = no). Completed steps are saved locally. Select Save configuration to apply.",
+        "menu_options": {
+          "zone": "Add hydraulic zone (shared water-temperature regime)",
+          "manifold": "Add distributor (manifold)",
+          "circuit": "Add circuit",
+          "telemetry_manifolds": "Distributor sensors",
+          "overview_menu": "Back to configuration overview",
+          "save": "Save configuration"
+        }
+      },
+      "rooms_menu": {
+        "title": "3. Rooms and sensors",
+        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nUnapplied draft: {pending} (1 = yes, 0 = no). Completed steps are saved locally. Select Save configuration to apply.",
+        "menu_options": {
+          "room": "Add or select room",
+          "room_setup": "Complete existing room (sensors and circuits)",
+          "discover_sensors": "Discover room sensors",
+          "binding": "Add room sensor",
+          "telemetry_rooms": "Room sensors",
+          "overview_menu": "Back to configuration overview",
+          "save": "Save configuration"
+        }
+      },
+      "sources_menu": {
+        "title": "4. Heat sources and costs",
+        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nUnapplied draft: {pending} (1 = yes, 0 = no). Completed steps are saved locally. Select Save configuration to apply.",
+        "menu_options": {
+          "source": "Add heat source",
+          "source_settings": "Source properties and tariff",
+          "telemetry_sources": "Heat source sensors",
+          "mode_source": "Reported source mode",
+          "economic_source": "Fuel and economic scenarios",
+          "hybrid_zone": "Hybrid operating strategy",
+          "overview_menu": "Back to configuration overview",
+          "save": "Save configuration"
+        }
+      },
+      "manage_menu": {
+        "title": "5. Edit or remove",
+        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nUnapplied draft: {pending} (1 = yes, 0 = no). Completed steps are saved locally. Select Save configuration to apply.",
+        "menu_options": {
+          "edit": "Edit existing configuration",
+          "remove": "Remove one or more objects",
+          "discard_draft": "Discard draft (keep saved configuration)",
+          "overview_menu": "Back to configuration overview",
+          "save": "Save configuration"
+        }
+      },
+      "all_actions": {
+        "title": "Expert – all configuration actions",
+        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nUnapplied draft: {pending} (1 = yes, 0 = no). Completed steps are saved locally. Select Save configuration to apply.",
+        "menu_options": {
+          "floor": "Add or select floor",
+          "zone": "Add hydraulic zone (shared water-temperature regime)",
+          "room": "Add or select room",
+          "source": "Add heat source",
+          "manifold": "Add distributor (manifold)",
+          "circuit": "Add circuit",
+          "binding": "Add room sensor",
+          "save": "Save configuration",
+          "outdoor": "Configure outdoor sensor",
+          "telemetry_rooms": "Room sensors",
+          "telemetry_sources": "Heat source sensors",
+          "telemetry_manifolds": "Distributor sensors",
+          "source_settings": "Source properties and tariff",
+          "mode_source": "Reported source mode",
+          "edit": "Edit existing configuration",
+          "remove": "Remove one or more objects",
+          "import_structure": "Import Home Assistant floors and areas",
+          "discover_sensors": "Discover room sensors",
+          "discard_draft": "Discard draft (keep saved configuration)",
+          "economic_source": "Fuel and economic scenarios",
+          "hybrid_zone": "Hybrid operating strategy",
+          "overview_menu": "Back to configuration overview",
+          "room_setup": "Complete existing room (sensors and circuits)"
+        }
+      },
+      "overview_menu": {
+        "title": "Back to configuration overview"
+      },
+      "room_setup": {
+        "title": "Complete existing room (sensors and circuits)",
+        "data": {
+          "room_id": "Room"
+        }
+      },
+      "room_complete": {
+        "title": "Complete room setup",
+        "description": "{room}: {sensors} temperature bindings, {circuits} existing circuits. Suggested ambient sensors can be changed before submission. Confirm physical circuit positions (e.g. 2,3); count is ADDITIONAL circuits, not the total. Leave count at 0 to skip. Existing circuits and sensors are retained. If no distributor exists, add one first and return here.",
+        "data": {
+          "temperatures": "Suggested ambient temperature sensors",
+          "humidity": "Humidity sensor (optional)",
+          "manual_temperature": "Additional manual temperature sensor (optional)",
+          "manifold_id": "Distributor",
+          "count": "Number of additional circuits",
+          "positions": "Physical positions, comma separated"
+        }
+      },
+      "remove_confirm": {
+        "title": "Review removal",
+        "description": "Selected: {selected}. Blocking dependent objects: {blockers}. Sources with zone links to detach: {sources}. No equipment or historical records are deleted. Remove blocking objects separately; selected zones can be detached from retained sources only with explicit consent. Save configuration to apply.",
+        "data": {
+          "confirmed": "Confirm selected removal",
+          "cancel": "Cancel and return to menu",
+          "detach_zone_sources": "Detach selected zones from retained sources"
         }
       }
     },
