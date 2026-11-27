@@ -112,7 +112,9 @@ def ws_overview(hass, connection, msg):
             modes[source["id"]] = classify_mode(
                 binding, state.state if state else None,
                 reported.timestamp() if reported else None, dt_util.utcnow().timestamp())
-        overview.append({"entry_id": entry.entry_id, "name": entry.title, "topology": topology,
+        overview.append({"entry_id": entry.entry_id, "name": entry.title, "topology": topology, "revision": revision(entry),
+                         "outdoor": history.outdoor_overview(topology) if history else None,
+                         "balance_advice": history.advice(topology, journal.entries) if history and journal else {},
                          "profiles": profiles.list_profiles() if profiles else [],
                          "defrost": monitor.overview(topology) if monitor else {},
                          "journal": journal.recent() if journal else [],

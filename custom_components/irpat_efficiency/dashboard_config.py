@@ -6,7 +6,7 @@ import json
 from .topology import TopologyError, add_item, empty_topology
 from .topology_edit import edit_item
 from .topology_remove import remove_selection
-from .registry_import import import_all, confirm_sensors
+from .registry_import import import_all, import_floor, import_room, _link, confirm_sensors
 from .room_setup import room_candidates
 from .ha_registry_reader import read_structure, read_entities
 from .storage_identity import generation
@@ -32,7 +32,7 @@ def temperature_entities(hass):
             continue
         state = hass.states.get(eid)
         unit = state.attributes.get("unit_of_measurement") if state else None
-        if eid.startswith("climate.") or (eid.startswith("sensor.") and
+        if eid.startswith(("climate.", "weather.")) or (eid.startswith("sensor.") and
                 (item.get("device_class") == "temperature" or unit in ("°C", "°F", "K", "C", "F"))):
             result[eid] = {**item, "temperature_c": read_binding(hass, item)["temperature_c"]}
     return result
@@ -57,15 +57,78 @@ def apply_action(hass, topology, action, p):
     if action == "import":
         floors, areas = read_structure(hass)
         fallback = p.get("fallback_floor")
-        if p.get("fallback_name"):
-            data, fallback = add_item(data, "floors", p["fallback_name"])
-        data = import_all(data, floors, areas, fallback)
+        selected = p.get("area_ids")
+        if selected is not None and (not isinstance(selected, list) or len(set(selected)) != len(selected)
+                                     or not set(selected) <= areas.keys()):
+            raise TopologyError("invalid_reference")
+        if p.get("single_native_floor"):
+            data, fallback = import_floor(data, floors, p["single_native_floor"])
+        elif p.get("fallback_name"):
+            name = p["fallback_name"]
+            if not isinstance(name, str):
+                raise TopologyError("invalid_name")
+            same = [f for f in data["floors"] if f["name"].casefold() == name.strip().casefold()]
+            if len(same) == 1:
+                fallback = same[0]["id"]
+            elif not same:
+                data, fallback = add_item(data, "floors", name)
+            else:
+                raise TopologyError("registry_conflict")
+        if p.get("single_floor") is True:
+            if not any(f["id"] == fallback for f in data["floors"]):
+                raise TopologyError("invalid_reference")
+            for aid in selected if selected is not None else areas:
+                linked = next((r for r in data["rooms"] if r.get("ha_area_id") == aid), None)
+                if linked:
+                    linked["floor_id"] = fallback
+                else:
+                    data, _ = _link(data, "rooms", "ha_area_id", aid, areas[aid]["name"], fallback)
+        elif selected is not None:
+            for aid in selected:
+                if areas[aid].get("floor_id") not in floors and not fallback:
+                    continue
+                data, _ = import_room(data, floors, areas, aid, fallback)
+        else:
+            data = import_all(data, floors, areas, fallback)
         entities = list(temperature_entities(hass).values())
         for room in data["rooms"]:
             _, preferred = room_candidates(hass, data, room, entities)
             if preferred:
                 data = confirm_sensors(data, room["id"], entities, preferred)
         return data
+    if action == "merge_floor":
+        if p.get("confirmed") is not True or p["id"] == p["target_id"]:
+            raise TopologyError("invalid_reference")
+        if not {p["id"], p["target_id"]} <= {f["id"] for f in data["floors"]}:
+            raise TopologyError("invalid_reference")
+        for group in ("rooms", "manifolds"):
+            for item in data[group]:
+                if item["floor_id"] == p["id"]:
+                    item["floor_id"] = p["target_id"]
+        return remove_selection(data, "floors", [p["id"]], confirmed=True)
+    if action == "move_room":
+        room = next((r for r in data["rooms"] if r["id"] == p["id"]), None)
+        if not room or not any(f["id"] == p["floor_id"] for f in data["floors"]):
+            raise TopologyError("invalid_reference")
+        room["floor_id"] = p["floor_id"]
+        return data
+    if action == "targets":
+        mode = p["mode"]
+        if mode not in ("heating", "cooling"):
+            raise TopologyError("invalid_mode")
+        ids = p.get("room_ids")
+        if not isinstance(ids, list) or not ids or not set(ids) <= {r["id"] for r in data["rooms"]}:
+            raise TopologyError("invalid_reference")
+        for room in list(data["rooms"]):
+            if room["id"] in ids:
+                data = edit_item(data, "rooms", room["id"], room["name"], **{mode+"_target_c": p["value"]})
+        return data
+    if action == "zone_settings":
+        zone = next((z for z in data["zones"] if z["id"] == p["id"]), None)
+        if not zone:
+            raise TopologyError("invalid_reference")
+        return edit_item(data, "zones", zone["id"], zone["name"],
+                         operating_mode=p["operating_mode"], circuit_control=p["circuit_control"])
     if action == "add_floor":
         return add_item(data, "floors", p["name"])[0]
     if action == "add_room":
@@ -78,7 +141,7 @@ def apply_action(hass, topology, action, p):
         return edit_item(data, p["collection"], p["id"], p["name"])
     if action == "bind":
         entity = temperature_entities(hass).get(p["entity_id"])
-        if not entity:
+        if not entity or not p["entity_id"].startswith(("sensor.", "climate.")):
             raise TopologyError("invalid_entity")
         if any(b["entity_id"] == p["entity_id"] for b in data.get("telemetry", [])):
             raise TopologyError("duplicate_entity")
@@ -88,7 +151,7 @@ def apply_action(hass, topology, action, p):
         eid = p.get("entity_id")
         if not eid:
             data.pop("outdoor_entity_id", None)
-        elif eid not in temperature_entities(hass) or not eid.startswith("sensor."):
+        elif eid not in temperature_entities(hass) or not eid.startswith(("sensor.", "weather.")):
             raise TopologyError("invalid_entity")
         elif any(b["entity_id"] == eid for b in data["bindings"] + data.get("telemetry", [])):
             raise TopologyError("duplicate_entity")

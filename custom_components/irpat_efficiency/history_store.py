@@ -18,6 +18,7 @@ from .topology import empty_topology
 from .temperature import summarize_room
 from .zone_analysis import zone_diagnostics
 from .thermal_review import zone_weather
+from .balance_advice import recommendations
 
 OUTDOOR_KEY = "__outdoor__"
 
@@ -48,6 +49,22 @@ class RoomHistory:
         now = dt_util.utcnow().timestamp()
         return {mode: zone_diagnostics(topology, self.data, now, journal, since, mode)
                 for mode in ("heating", "cooling")}
+
+    def advice(self, topology, journal):
+        since = self.configuration_since if self.configuration_hash == self.fingerprint(topology) and not self.save_failed else None
+        return recommendations(topology, self.data, dt_util.utcnow().timestamp(), journal, since)
+
+    def outdoor_overview(self, topology):
+        entity_id = topology.get("outdoor_entity_id")
+        if not entity_id:
+            return None
+        reading = read_binding(self.hass, {"entity_id": entity_id, "name": "Outdoor"})
+        state = self.hass.states.get(entity_id)
+        if state:
+            reading["name"] = state.name
+        tz = dt_util.get_time_zone(self.hass.config.time_zone)
+        current = current_series(self.data, self.configuration_hash, self.configuration_since, self.fingerprint(topology))
+        return {"reading": reading, "history": compare_room(current.get(OUTDOOR_KEY, {}), dt_util.utcnow().timestamp(), tz) if tz else {}}
 
     def weather_observations(self, topology):
         """Produce unreviewed, synchronized weather summaries per zone."""

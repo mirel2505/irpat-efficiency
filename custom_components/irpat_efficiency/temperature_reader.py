@@ -25,6 +25,9 @@ def read_binding(hass, binding):
     if entity_id.startswith("climate."):
         value = state.attributes.get("current_temperature")
         unit = state.attributes.get("temperature_unit") or hass.config.units.temperature_unit
+    elif entity_id.startswith("weather."):
+        value = state.attributes.get("temperature")
+        unit = state.attributes.get("temperature_unit") or hass.config.units.temperature_unit
     else:
         value = state.state
         unit = state.attributes.get("unit_of_measurement")
