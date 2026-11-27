@@ -1,110 +1,75 @@
 # irPaT & Eficiență
 
-**Asistență pentru echilibrarea hidraulică și termică a încălzirii și răcirii prin pardoseală cu agent termic.**
+**Asistență locală pentru echilibrarea hidraulică și termică a încălzirii și răcirii prin pardoseală cu agent termic.**
 
-Local, advisory-only Home Assistant integration for hydronic radiant floor heating/cooling, hydraulic and thermal balancing, weather compensation, and energy efficiency.
+Local, advisory-only Home Assistant integration for hydronic radiant floor heating and cooling.
 
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Support%20development-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/rmirel2505o)
 
 ## Stadiu / Status
 
-**0.1.0.dev0 — experimental foundation, not ready for installation on a production system.**
-Initial configuration entry, topology model, native options forms for adding floors, zones, rooms, manifolds, circuits, sources and ambient temperature bindings, and calculation primitives are implemented in source. Native forms are not yet validated on Home Assistant. An experimental administrator-only sidebar overview is implemented in source, displaying the saved topology, heating targets and graphical manifolds in physical circuit order. It uses a local dependency-free JavaScript custom element as a bootstrap; the planned TypeScript/Lit editor, full interactive manifold editing, complete configuration editing, long-term history, balancing assistant and reports are not yet implemented. An initial local history collector stores one temperature sample per room every five minutes while HA is running, independently of the panel, using HA Store. It retains eight days of recent samples, exposes 24/48/72/168-hour sample summaries and coverage, and compares yesterday's local five-minute slot. It skips incomplete room readings and HA state reports older than a provisional two-hour threshold (not necessarily actual device measurement age). No gaps are interpolated. No Recorder import or longer-term aggregates are implemented yet; these are required before release. History across sensor configuration changes needs additional validation. The overview now reads configured ambient sensor and thermostat temperatures, converts explicit units to Celsius, shows the mean of available readings and the individual heating/cooling target and deviation, and refreshes every 30 seconds while visible. Reading age is displayed, but automatic stale-data rejection in the instantaneous display and configurable sensor aggregation/tolerance remain pending. Instantaneous status is not evidence of completed balancing. Panel registration and rendering still require a real Home Assistant smoke test. Marketplace metadata (hacs.json) is present; installation has not been validated. No release is available.
+**0.1.0.dev0 — development build, not a validated release.** The repository is private. Do not install on a production system before the isolated Home Assistant tests and owner approval. See [implementation scope and release gates](IMPLEMENTATION_STATUS.md) for the distinction between implemented functionality and the full product specification.
 
-The initial hydraulic journal model now validates manual loop readings, distinguishes a measured manifold total from the sum of all loops and source flow, links before/after observations, and supports conditional normalization to a comparable reference total. The experimental administrator-only panel now includes a manual flow form for each manifold, before/after references, optional manifold/source totals and notes, plus the five latest observations per manifold from the last 100 entries. The backend appends to a per-entry HA Store, serializes writes, saves before reporting success, and attaches available room readings and zone context. Automatic supply/return/outdoor readings, full journal pagination, normalization display and integration-level validation remain pending. On 2026-11-27, 16 local unit tests passed: five calculation, six hydraulic snapshot, and five journal persistence tests using an injected simulated store. The Git blob hashes of the six calculation/journal/persistence source and test files matched their repository versions. Other test modules, the actual HA Store adapter, WebSocket endpoint and browser runtime have not yet been verified in this test run.
+## Funcționalități / Implemented in source
 
-## Thermal balance diagnostics — experimental
+- Configurare nativă HA, fără YAML obligatoriu: niveluri, camere, zone hidraulice, distribuitoare, circuite, surse și senzori. Editare cu identificatori stabili și eliminare confirmată fără ștergerea în cascadă. / Native configuration and safe identity-preserving editing.
+- Panou local în sidebar, administrator-only, română/engleză, mod simplu/expert, teme HA, afișare adaptivă. / Local bilingual panel with simple and expert views.
+- Monitorizare instantanee a temperaturilor și țintelor de încălzire/răcire; statistici 24/48/72/168 h și comparație cu ieri la aceeași oră. Istoricul local păstrează 8 zile; golurile rămân vizibile. / Room temperature monitoring and bounded local history.
+- Jurnal manual de debite, observații înainte/după, profiluri și comparații brute pe circuit. Ultima observație afișată nu reprezintă debit live. / Manual hydraulic observations and reference profiles.
+- Diagnostic termic pe zone, abatere comună și diferențe între camere, stabilitate observată, analiză climatică și răcire naturală cu confirmarea condițiilor de către utilizator. / Thermal balance, reviewed climate and natural cooling observations.
+- Puteri, diferență tur-retur, energie electrică, cost orientativ și raport energetic pe intervalele cu măsurători compatibile; jurnale de degivrare și regim. / Energy monitoring with measurement boundaries and coverage.
+- Punct de rouă și indicator de risc de condens, cu distincția dintre temperatura măsurată a suprafeței și temperatura apei. / Condensation review; independent physical protection remains necessary.
+- Rapoarte comparative ale clădirii, export JSON versionat și opt categorii CSV; pregătirea jurnalelor pentru backupul nativ HA. / Reviewed building reports, data export and native backup preparation.
 
-The pure Python thermal balance engine compares aligned five-minute room samples over at least 24 hours, with a provisional minimum common coverage of 90% and ±0.3°C tolerance. It separates common temperature error from individual room residuals, uses area weighting only when every room has a valid area, and reports observed in-tolerance sample fractions. It returns settling when a known adjustment occurs within the analysis interval and monitor-only when the caller identifies an incompatible operating mode. These are descriptive diagnostics, not automatic hardware instructions or certification of balance. The zone topology adapter, conservative configuration epoch, journal-linked settling and preliminary panel display are implemented in source. Actual operating-mode verification, environmental comparability and detection of unlogged interventions remain pending.
+No external AI or telemetry service is required. No service calls to physical heating/cooling equipment. A selected display mode does not change the equipment mode. Advice remains conditional on measurement coverage, accuracy, comparability and configured operating assumptions.
 
-Seven thermal balance unit tests were executed locally on 2026-11-27 and passed. The tested source and test file Git blob hashes were verified against the repository: `cb175b075f165a64f0626a46243e6ddaa8d6d79c` and `af6fea7901442319d6aad4fb69e2e3a039cd98d9`. No full Home Assistant runtime validation has been performed in this step.
+## Configurare / Planned first setup
 
-## Consecutive stability and manual reference profiles — experimental
+After a validated installation, add the integration from Settings → Devices & services. Create a named installation, then open Configure and add floors and hydraulic zones before rooms, sources, manifolds, circuits and bindings. Select sensors using the native entity selectors; thermostats supply current_temperature, not setpoints. Set heating and cooling targets separately. Save configuration explicitly. Open the irPaT & Eficiență sidebar panel.
 
-Stability evaluates consecutive rolling 24-hour windows, using five-minute aligned room samples. The pure motor accepts 3–7 days, defaults to five, and applies provisional criteria: 90% common sample coverage per window and 95% of observed common samples within ±0.3°C of each room's target. A failed daily window interrupts the consecutive count. Changes in configuration and logged before/after adjustments restrict the eligible window. The panel displays observed stability, not certified hydraulic balance. The actual operating regime, outdoor conditions, unlogged disturbances and sensor precision have not been validated; no automatic balance confirmation or equipment control is performed. The duration is configurable in the pure motor but not yet exposed in the UI.
+Select Expert to see profiles, reviewed climate and inertia forms, mode/defrost journals, building reports and export. Record physical flow readings manually. Leave unavailable values empty. Do not confirm measurement boundaries, continuous operation or comparable conditions without evidence.
 
-Manual reference profile construction requires a complete set of circuit readings for each manifold in the selected hydraulic zone. Profiles retain source snapshot IDs, timestamps, targets, mode and flows, without automatically asserting balance or sending restoration commands. Persistent profile storage, UI, comparison and guided manual restoration remain pending. Snapshots may be from different times; the profile is a historical reference, not proof of simultaneous hydraulic conditions.
+Temperature history samples every five minutes while HA is running; reports older than the provisional two-hour limit and future timestamps are excluded. Configuration edits restart eligible comparison history conservatively. A retained sample is not proof of a fresh physical sensor measurement. Do not interpret stability as certified hydraulic balance.
 
-On 2026-11-27, 14 local unit tests passed in Python: nine stability and five profile construction tests. Tested Git blob hashes match the committed files: stability.py `83d762f8491f82f4b2a0c3e63693a73be54ff1b8`, test_stability.py `ce236e5c84aaf1f7cb7e27b0d03538d7c7e46b6d`, profiles.py `80d5a40e23949a077383e0286084a3d11f24e507`, test_profiles.py `3ec8e52c9596f13902a8cefa5e5a9f339bfb8518`. These results do not constitute a complete regression run or an HA integration test.
+## Backup and recovery / Backup și restaurare
 
-## Climate curve diagnostics — experimental
+Use **Settings → System → Backups** and include Home Assistant settings. Keep the backup and emergency kit outside the HA device. The integration retries pending defrost/mode journal saves before native backup. This is not an atomic snapshot across all stores; unsaved records may be lost. Restoring HA settings may replace other system configuration. Keep a current backup before restoring. CSV/JSON are analysis archives, not directly restorable backups. See [official HA backup guidance](https://www.home-assistant.io/common-tasks/general/backups/).
 
-The pure Python heating-curve module evaluates reviewed comparable daily observations with aligned outdoor temperature and common room error, rejecting incomplete coverage and excessive local residuals. Provisional requirements: at least three distinct reviewed days for offset or fixed-supply hypotheses; at least five and a 5°C outdoor span for slope hypotheses; fixed supply observations require a maximum 2°C outdoor span. These are heuristics, not validated causal or automatic adjustment rules. Cooling slope diagnostics are not implemented. The comfort-direction helper preserves the distinction between desired room temperature and supply temperature, and blocks colder cooling targets pending condensation review.
+## Instalare / Installation — not released
 
-On 2026-11-27, nine climate-curve unit tests were executed locally and passed. The exact tested Git blobs are climate_curve.py `5c05fe88529c9f32dec5a0a3226ab1950fee53c6` and test_climate_curve.py `661d66972f19e140cb2049fcf0ef759d79c8e856`. Actual outdoor sensor configuration, synchronized collection, comparable-day review UI, journal integration, comfort target editing and HA runtime testing remain pending. No equipment commands are issued.
-
-## Natural cooling and inertia diagnostics — experimental
-
-The pure Python inertia module measures observed indoor temperature drift over reviewed natural cooling intervals, without switching equipment off. It requires confirmed absence of active heating input, reviewed comparable conditions, at least two hours, and complete synchronized five-minute indoor/outdoor samples including endpoints. It reports temperature drop, °C/hour, and, only with positive indoor/outdoor temperature differences and positive cooling, an observed drop divided by integrated degree-hours (1/hour). This is an observational indicator, not an insulation coefficient or measured thermal capacity; residual slab heat, solar gains, ventilation and other influences remain important. Automatic interval detection, source-state bindings, review UI and before/after comparisons are pending.
-
-Eight inertia unit tests were executed locally on 2026-11-27 and passed. Git blob hashes matched the tested files: inertia.py `58f3390918b219f40c9cfcaaddd0865fde012e18` and test_inertia.py `d7d6e09dfe19dc5cfda355517664310e22e659f6`. This is not a full regression run or a Home Assistant runtime test.
-
-## Energy efficiency diagnostics — experimental
-
-The pure Python efficiency module integrates matched five-minute electrical and signed thermal power samples with the trapezoidal rule. Missing or invalid endpoints exclude the affected interval from both energies; partial results explicitly include coverage. COP is the ratio of matched net useful thermal energy to electrical energy, with cooling sign convention and defrost losses included in the net balance. This requires confirmed common measurement boundaries and mode. Constant-tariff costs and thermal energy per floor area are optional. A decreasing cumulative meter is rejected across resets, rather than reconstructed. Apparent heat loss per degree-hour is calculated only for reviewed, completely covered periods; fuel efficiency requires explicitly stated LHV or HHV input. Actual source bindings, meter history, high-frequency defrost accounting, dashboard integration and real Home Assistant validation remain pending.
-
-On 2026-11-27, all 11 efficiency unit tests passed in local Python. The tested Git blob hashes match the committed files: efficiency.py `9e3561f0de5d55c6b01294595f334e7d3c52d23e` and test_efficiency.py `ba71cf44932853b5a9f0796dc87301c63abda679`. This was a targeted module test, not a full regression run.
-
-## Cooling and condensation diagnostics — experimental
-
-The pure Python condensation module estimates dew point from synchronized indoor air temperature and relative humidity. It separately compares the measured surface temperature and a supply-water temperature proxy. Provisional defaults: 2°C review margin, maximum report age 900 seconds and maximum timestamp skew 300 seconds. Missing, stale, invalid or unsynchronized readings remain unknown; a zone with incomplete measured surface coverage cannot be declared low risk. Even observed surface temperatures above the margin are not a declaration of safe cooling. Independent hardware condensation protection is required. Actual humidity/surface/supply sensor bindings, runtime assessment, configurable thresholds and panel display remain pending. No equipment commands are issued.
-
-On 2026-11-27, the available local subset of 33 unit tests passed, including 11 new condensation tests. Git blob hashes of the two new tested files match the committed files: condensation.py `9bfc541febc2af80295784544493630050db0824` and test_condensation.py `698c721a28f8cdfce6d832e40e22805574313405`. This was not a complete repository regression run or a Home Assistant runtime test.
-
-## Principii / Principles
-
-- Local, read-only towards physical equipment; manual adjustments by the user.
-- Manufacturer-independent, with optional sensor inputs and user-defined names.
-- The initial topology model supports multiple floors, manifolds and independent hydraulic zones.
-- Full balancing method: continuous weather compensation with open circuits; fixed supply with continuous operation has limited support; ON/OFF-controlled systems remain monitoring-only.
-- No mandatory YAML, no hardcoded personal configuration, no cloud subscription.
-
-## Instalare / Installation — planned
-
-Home Assistant 2026.11+ includes Marketplace under **Settings → Marketplace**, replacing standalone HACS. The project retains the required `hacs.json` metadata for Marketplace and legacy HACS compatibility.
+Planned distribution targets are Home Assistant Marketplace and compatible HACS installations. Metadata and links are prepared, but installation has not been validated and the repository is private.
 
 [![Open in Home Assistant Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=mirel2505&repository=irpat-efficiency&category=integration)
 
 [![Configure irPaT & Eficiență in Home Assistant](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=irpat_efficiency)
 
-**Not ready for installation:** the repository is private during development and no validated release is available. These links are prepared for the future release. After publication, open the first link, confirm installation in your own Home Assistant, then use the second link to start setup. Restart only if Home Assistant requires it.
+Release and catalog availability require owner approval and validation. See the [Marketplace integration guide](https://contributors.home-assistant.io/marketplace/guides/integrations/).
 
-For older Home Assistant versions using HACS, compatibility remains a validation target, not a guarantee.
+## Development and verification
 
-Official guide: https://contributors.home-assistant.io/marketplace/guides/integrations/
-
-## Documentation
-
-- [SPECIFICATION.md](SPECIFICATION.md) — agreed product requirements (Romanian)
-- [ARCHITECTURE.md](ARCHITECTURE.md) — proposed architecture
-- [ALGORITHMS.md](ALGORITHMS.md) — mathematical and validation contract
-- [ROADMAP.md](ROADMAP.md) — development milestones
-
-## Backup and recovery / Backup și restaurare
-
-Use **Settings → System → Backups** and include Home Assistant settings. The integration configuration and its seven per-entry HA Store files reside in the Home Assistant configuration directory. Preserve the native backup and encryption emergency kit outside the Home Assistant device.
-
-The integration's backup platform retries pending mode and defrost journal writes before native backup. Failures are logged; an ongoing system backup is not deliberately aborted. Only committed records can be recovered; this is not an atomic snapshot across all stores, and collection is not paused. No automatic backup scheduling, restore, or equipment command is performed by irPaT.
-
-Restoring Home Assistant settings can replace other system configuration and requires the native HA restore workflow. Keep a current backup before restoring. CSV and JSON exports are analysis archives, **not** directly restorable backups. No individual store import or partial overwrite is supported. Verify room bindings, history coverage, profiles, observations and source IDs after a native restore.
-
-See [official backup and restoration documentation](https://www.home-assistant.io/common-tasks/general/backups/). Actual backup archive contents and end-to-end restore must still be tested on an isolated Home Assistant installation before beta.
-
-## Development
-
-Run the initial pure-Python calculation, topology, temperature, history and hydraulic journal unit tests from the repository root:
+Run from the repository root:
 
 ```sh
 python -m unittest discover -s tests -v
+python -m compileall -q custom_components
+node --check custom_components/irpat_efficiency/frontend/panel.js
+node scripts/check_ui_contracts.mjs
+node scripts/test_panel_behavior.mjs
 ```
 
-Home Assistant integration tests, browser rendering tests and Marketplace packaging validation remain pending.
+The available local Python subset passed 261 tests on 2026-11-27. Seven panel behavior checks passed against the actual JavaScript class with a minimal DOM stub. These results are not full pinned-commit CI or browser/HA execution results. The HA compatibility workflow is configured, but a successful run has not been confirmed. No beta release is available.
 
-## Support / Susținere
+- [SPECIFICATION.md](SPECIFICATION.md) — original full product requirements
+- [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) — current scope, gaps, release gates
+- [ARCHITECTURE.md](ARCHITECTURE.md) — architecture
+- [ALGORITHMS.md](ALGORITHMS.md) — algorithms
+- [ROADMAP.md](ROADMAP.md) — chronological development and verification record
+
+## Susținere / Support
 
 Donațiile sunt voluntare și susțin timpul investit în dezvoltare, mentenanța și costurile instrumentelor și abonamentelor AI folosite în proiect. Funcționalitățile integrării nu sunt condiționate de donații.
 
-Voluntary donations support development time, maintenance and AI tool subscription costs. No features are paywalled.
+Voluntary donations support development, maintenance and AI tool subscription costs. No features are paywalled.
 
 [Buy Me a Coffee](https://buymeacoffee.com/rmirel2505o)
 
