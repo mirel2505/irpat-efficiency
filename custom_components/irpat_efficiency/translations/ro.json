@@ -65,6 +65,15 @@
         "pump": "Pompă",
         "pressure": "Presiune"
       }
+    },
+    "fluid_type": {
+      "options": {
+        "unknown": "Necunoscut",
+        "water": "Apă",
+        "propylene_glycol": "Amestec cu propilenglicol",
+        "ethylene_glycol": "Amestec cu etilenglicol",
+        "other": "Alt agent termic"
+      }
     }
   },
   "options": {
@@ -84,7 +93,8 @@
           "outdoor": "Configurează senzor exterior",
           "telemetry_rooms": "Senzori încăperi",
           "telemetry_sources": "Senzori surse termice",
-          "telemetry_manifolds": "Senzori distribuitoare"
+          "telemetry_manifolds": "Senzori distribuitoare",
+          "source_settings": "Proprietăți și tarif sursă"
         }
       },
       "floor": {
@@ -181,6 +191,25 @@
           "name": "Denumire proprie (opțional)",
           "entity_id": "Entitate"
         }
+      },
+      "source_settings": {
+        "title": "Alege sursa",
+        "data": {
+          "source_id": "Sursă termică"
+        }
+      },
+      "source_properties": {
+        "title": "Proprietăți agent termic și costuri",
+        "description": "Completează densitatea și căldura specifică împreună, conform fișei agentului termic la temperatura relevantă. Câmpurile opționale goale elimină valorile. Confirmă numai măsurători cu limite compatibile; nu confirmă regimul real de funcționare. Tariful se aplică estimativ consumului observat.",
+        "data": {
+          "fluid_type": "Agent termic",
+          "density_kg_m3": "Densitate",
+          "cp_j_kgk": "Căldură specifică",
+          "tariff": "Tarif electric / kWh",
+          "currency": "Cod monedă (ex. RON, EUR)",
+          "power_boundary_confirmed": "Confirmă compatibilitatea măsurătorilor de putere",
+          "energy_boundary_confirmed": "Confirmă limitele contorului de energie"
+        }
       }
     },
     "error": {
@@ -194,7 +223,11 @@
       "invalid_entity": "Entitate incompatibilă.",
       "duplicate_entity": "Senzor deja asociat.",
       "invalid_schema": "Configurație incompatibilă.",
-      "invalid_role": "Rol incompatibil."
+      "invalid_role": "Rol incompatibil.",
+      "invalid_fluid": "Agent termic invalid.",
+      "invalid_fluid_properties": "Introdu ambele proprietăți valide pentru un agent termic cunoscut.",
+      "invalid_tariff": "Tarif sau cod monedă invalid.",
+      "invalid_boundary": "Confirmare invalidă."
     }
   }
 }
