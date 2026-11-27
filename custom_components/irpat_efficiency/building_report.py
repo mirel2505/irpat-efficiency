@@ -43,7 +43,7 @@ def snapshot(indoor, outdoor, start, end, *, room_ids, boundary_id,
             'reviewed': True}
 
 
-def compare(before, after, *, intervention_at, comparable=False):
+def compare(before, after, *, intervention_at, comparable=False, indoor_tolerance_c=0.5):
     """Compare reviewed observations; lower normalized input is not proven savings."""
     if (comparable is not True or before.get('reviewed') is not True
             or after.get('reviewed') is not True):
@@ -52,6 +52,10 @@ def compare(before, after, *, intervention_at, comparable=False):
         raise ValueError('invalid_intervention_date')
     if any(before[k] != after[k] for k in ('room_ids', 'boundary_id')):
         raise ValueError('incompatible_boundary')
+    if (not finite(indoor_tolerance_c) or indoor_tolerance_c < 0
+            or not all(finite(p.get('indoor_mean_c')) for p in (before, after))
+            or abs(before['indoor_mean_c'] - after['indoor_mean_c']) > indoor_tolerance_c):
+        raise ValueError('incompatible_comfort')
     x,y = before['apparent_w_per_k'],after['apparent_w_per_k']
     if not finite(x) or not finite(y) or min(x,y) <= 0:
         raise ValueError('invalid_energy')
