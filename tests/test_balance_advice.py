@@ -55,3 +55,11 @@ def test_adjustment_resets_window():
     assert result["last_adjustment_at"]==90000
     assert result["earliest_review_at"]==262800
     assert result["remaining_hours"]==25
+
+def test_mixed_error_blocks_curve_even_when_common_error_persists():
+    t,z,(a,b)=setup()
+    slots=[str(s) for s in range(0,172800,300)]
+    data={a:dict.fromkeys(slots,23.8),b:dict.fromkeys(slots,22.4),"__outdoor__":dict.fromkeys(slots,5)}
+    result=recommendations(t,data,172800,[],0)[z]
+    assert result["curve_gate"]=="balance_required"
+    assert "common_direction" not in result

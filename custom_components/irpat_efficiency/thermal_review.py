@@ -3,6 +3,7 @@ from datetime import datetime
 
 from .calculations import balancing_capability
 from .climate_curve import diagnose_curve, finite
+from .curve_gate import gate, balanced_day, SETTLING
 from .inertia import cooling_drift
 from .topology import temperature_conflicts
 from .weather_history import daily_observations
@@ -53,13 +54,27 @@ def review_curve(topology, series, journal, zone_id, end, starts, *, now, since,
         raise ValueError('incompatible_history')
     mids = {m['id'] for m in topology['manifolds'] if m['zone_id'] == zone_id}
     adjustments = [datetime.fromisoformat(s['timestamp']).timestamp() for s in journal
-                   if s['manifold_id'] in mids and s['phase'] in ('before', 'after')]
+                   if s['manifold_id'] in mids and s['phase'] in ('before', 'after', 'adjustment')]
     # Do not use data preceding or spanning the latest logged intervention.
     if adjustments and min(starts) < max(adjustments):
         raise ValueError('adjustment_since_observation')
-    result = diagnose_curve([{**rows[s], 'comparable': True} for s in starts],
-                            capability=balancing_capability(zone['operating_mode'], zone['circuit_control']),
-                            mode='heating')
+    capability = balancing_capability(zone['operating_mode'], zone['circuit_control'])
+    if capability == 'monitor_only':
+        result = {'status': 'monitor_only', 'direction': None, 'days': 0}
+    else:
+        status, _, rooms, last = gate(topology, series, journal, zone_id, now, since)
+        if status != 'eligible':
+            result = {'status': status, 'direction': None, 'days': 0}
+        else:
+            grouped = {d['start']: d for d in daily_observations(
+                rooms, series, series.get('__outdoor__', {}), end, since=since)}
+            if last is not None and min(starts) < last + SETTLING:
+                result = {'status': 'settling', 'direction': None, 'days': 0}
+            elif not all(s in grouped and balanced_day(grouped[s]) for s in starts):
+                result = {'status': 'balance_required', 'direction': None, 'days': 0}
+            else:
+                result = diagnose_curve([{**grouped[s], 'comparable': True} for s in starts],
+                                        capability=capability, mode='heating')
     return {**result, 'zone_id': zone_id, 'reviewed_by_user': True, 'advisory_only': True}
 
 

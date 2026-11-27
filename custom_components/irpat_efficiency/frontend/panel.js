@@ -445,7 +445,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       const form=this.node("form"),choices=[];
       for(const d of rows){
         const label=this.node("label"),check=this.node("input");check.type="checkbox";
-        check.disabled=d.coverage<0.9||d.common_error_c==null||d.outdoor_c==null;
+        check.disabled=d.coverage<0.9||d.common_error_c==null||d.outdoor_c==null||d.max_residual_c>0.300000001||d.relative_balance_fraction<0.95;
         const temp=v=>v==null?"—":v.toFixed(2)+" °C";
         label.append(check,document.createTextNode(" "+new Date(d.start*1000).toLocaleString()+" — "+new Date(d.end*1000).toLocaleString()+" · "+this.t("Exterior ","Outdoor ")+temp(d.outdoor_c)+" · "+this.t("Abatere ","Error ")+temp(d.common_error_c)+" · "+Math.round(d.coverage*100)+"%"));
         choices.push({check,start:d.start});form.append(label);
@@ -454,7 +454,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       const output=this.node("div");
       this.reviewButton(entry,form,()=>({type:"irpat_efficiency/curve_review",zone_id:z.id,end:rows[0].end,
         starts:choices.filter(x=>x.check.checked).map(x=>x.start),reviewed:reviewed.checked}),output,r=>{
-        const labels={review_slope:this.t("Verifică panta curbei","Review curve slope"),review_offset:this.t("Verifică deplasarea curbei","Review curve offset"),review_fixed_supply:this.t("Verifică temperatura de tur","Review supply temperature"),near_targets:this.t("Aproape de ținte","Near targets"),insufficient_data:this.t("Date insuficiente","Insufficient data"),monitor_only:this.t("Doar monitorizare","Monitoring only"),weather_changed:this.t("Condiții exterioare diferite","Outdoor conditions changed"),inconclusive:this.t("Rezultat neconcludent","Inconclusive"),duplicate_day:this.t("Perioadă duplicată","Duplicate period")};
+        const labels={balance_required:this.t("Meteoreglare blocată: echilibrează mai întâi încăperile","Weather curve blocked: balance rooms first"),balance_data_required:this.t("Date insuficiente pentru echilibrul întregii surse","Insufficient source-wide balance data"),settling:this.t("Așteaptă stabilizarea după reglaj","Wait for settling after adjustment"),weather_not_comparable:this.t("Condiții meteo necomparabile","Weather conditions not comparable"),no_common_error:this.t("Abatere generală neconfirmată","Common error not confirmed"),review_slope:this.t("Verifică panta curbei","Review curve slope"),review_offset:this.t("Verifică deplasarea curbei","Review curve offset"),review_fixed_supply:this.t("Verifică temperatura de tur","Review supply temperature"),near_targets:this.t("Aproape de ținte","Near targets"),insufficient_data:this.t("Date insuficiente","Insufficient data"),monitor_only:this.t("Doar monitorizare","Monitoring only"),weather_changed:this.t("Condiții exterioare diferite","Outdoor conditions changed"),inconclusive:this.t("Rezultat neconcludent","Inconclusive"),duplicate_day:this.t("Perioadă duplicată","Duplicate period")};
         const directions={raise:this.t("Sens de analizat: creștere","Direction to review: increase"),lower:this.t("Sens de analizat: reducere","Direction to review: decrease"),steeper:this.t("Sens de analizat: pantă mai mare","Direction to review: steeper slope"),flatter:this.t("Sens de analizat: pantă mai mică","Direction to review: flatter slope")};
         output.append(this.node("p",labels[r.status]||r.status),this.node("small",this.t("Perioade utilizate: ","Periods used: ")+r.days));
         if(r.direction)output.append(this.node("p",directions[r.direction]||r.direction));
@@ -887,12 +887,14 @@ class IrpatEfficiencyPanel extends HTMLElement {
       if(a.status!=="review_conditions"){zone.append(this.node("p",labels[a.status]||a.status));box.append(zone);continue;}
       const key=entry.entry_id+":"+entry.revision+":"+id+":"+a.window_end+":"+JSON.stringify(a.rooms);
       zone.append(this.node("p",this.t("Analiză: 48 h · exterior ","Analysis: 48 h · outdoor ")+a.outdoor_means_c.map(v=>v.toFixed(1)+"°C").join(" / ")+" · "+Math.round(a.coverage*100)+"%"));
-      if(a.common_direction)zone.append(this.node("p",this.t("Abatere generală: verifică mai întâi temperatura de tur sau curba climatică.","Common error: first review supply temperature or the weather curve."),"muted"));
+      if(a.curve_gate==="balance_required")zone.append(this.node("p",this.t("Meteoreglare blocată: echilibrează mai întâi toate încăperile alimentate de sursă.","Weather curve blocked: balance all rooms served by the source first."),"muted"));
+      else if(a.curve_gate==="settling"||a.curve_gate==="balance_data_required")zone.append(this.node("p",this.t("Meteoreglare în așteptare: stabilizare sau date complete pentru toate zonele sursei.","Weather curve pending: settling or complete data for all source zones."),"muted"));
       if(!this.reviewedWindows.has(key)){
         const review=this.node("label",this.t("Confirm că în aceste 48 h a funcționat încălzirea normal, fără reglaje neînregistrate, ferestre deschise prelungit sau aporturi neobișnuite de căldură.","I confirm normal heating during these 48 h, without unlogged adjustments, prolonged open windows or unusual heat gains."));
         const cb=this.node("input");cb.type="checkbox";review.prepend(cb);zone.append(review);
         const b=this.setupButton(zone,this.t("Verifică recomandările","Review suggestions"),()=>{if(cb.checked){this.reviewedWindows.add(key);this.render();}});b.disabled=true;cb.addEventListener("change",()=>{b.disabled=!cb.checked;});
       }else{
+        if(a.common_direction)zone.append(this.node("p",this.t("Echilibru relativ confirmat; abatere comună: analizează curba meteo sau temperatura de tur.","Relative balance confirmed; common error: review the weather curve or supply temperature."),"muted"));
         const desc={decrease:this.t("Verifică o mică reducere a debitului","Review a small flow reduction"),increase:this.t("Verifică o mică creștere a debitului","Review a small flow increase"),hold:this.t("Menține reglajul","Keep adjustment"),observe:this.t("Continuă monitorizarea","Continue monitoring")};
         for(const [rid,r] of Object.entries(a.rooms)){
           const line=this.node("div",undefined,"advice-line");line.append(this.icon(r.direction==="increase"?"up":r.direction==="decrease"?"down":r.direction==="hold"?"check":"clock"));

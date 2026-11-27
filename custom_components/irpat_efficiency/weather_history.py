@@ -39,7 +39,16 @@ def daily_observations(rooms, series, outdoor, end, *, since, days=7):
                   for i in ids} if aligned else {}
         common = (sum(errors[i] * a for i, a in zip(ids, areas)) / sum(areas)
                   if weighted else mean(errors.values())) if errors else None
+        # Check relative balance throughout the window, not only daily averages.
+        balanced_slots = 0
+        for k in aligned:
+            instantaneous = [series[i][k] - targets[i] for i in ids]
+            offset_c = (sum(e*a for e, a in zip(instantaneous, areas)) / sum(areas)
+                        if weighted else mean(instantaneous))
+            if all(abs(e-offset_c) <= .3 + 1e-9 for e in instantaneous):
+                balanced_slots += 1
         observations.append(dict(day=str(start), start=start, end=stop,
+             room_errors_c=errors, relative_balance_fraction=balanced_slots/len(aligned) if aligned else 0,
             outdoor_c=mean(outdoor[k] for k in aligned) if aligned else None,
             common_error_c=common,
             max_residual_c=max(abs(e-common) for e in errors.values()) if errors else None,

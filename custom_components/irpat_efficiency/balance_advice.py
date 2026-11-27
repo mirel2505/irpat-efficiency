@@ -7,6 +7,7 @@ from datetime import datetime
 from statistics import mean
 
 from .calculations import balancing_capability
+from .curve_gate import gate
 from .thermal_balance import analyze_zone
 from .topology import temperature_conflicts
 from .weather_history import valid
@@ -115,7 +116,9 @@ def recommendations(topology, series, now, journal, since):
                                  "circuits": [dict(id=c["id"], position=c["position"],
                                                   manifold_id=c["manifold_id"])
                                               for c in circuits if c["room_id"] == rid]}
-        if all(abs(x) > TOLERANCE for x in row["common_errors_c"]) and all(
-                x * row["common_errors_c"][0] > 0 for x in row["common_errors_c"]):
+        gate_status, sign, _, _ = gate(topology, series, journal, zid, now, since)
+        row["curve_gate"] = gate_status
+        if gate_status == "eligible":
             row["common_direction"] = "review_supply"
+            row["common_supply_direction"] = "lower" if sign > 0 else "raise"
     return result
