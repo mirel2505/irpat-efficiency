@@ -1,6 +1,5 @@
 """Local journal of observed source mode transitions, without device commands."""
 import asyncio
-from copy import deepcopy
 from datetime import timedelta
 import logging
 
@@ -9,6 +8,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
+from .event_journal import EventJournal
 from .mode_history import observation, transition
 from .topology import empty_topology
 
@@ -20,21 +20,15 @@ class ModeMonitor:
         self.hass = hass
         self.entry = entry
         self.store = Store(hass, 1, f"{DOMAIN}.modes.{entry.entry_id}")
-        self.events = []
+        self.journal = EventJournal(self.store, "observed_at", 3000)
         self.previous = {}
         self.last_sample = None
         self.cancel = None
         self.closed = False
         self.lock = asyncio.Lock()
-        self.save_failed = False
-        self.dirty = False
 
     async def async_start(self):
-        saved = await self.store.async_load()
-        if saved is not None:
-            if not isinstance(saved, dict) or not isinstance(saved.get("events"), list):
-                raise ValueError("invalid_mode_history")
-            self.events = saved["events"]
+        await self.journal.async_load()
         self.cancel = async_track_time_interval(self.hass, self.async_sample, timedelta(seconds=30))
 
     async def async_sample(self, now):
@@ -60,26 +54,17 @@ class ModeMonitor:
                                       reported.timestamp(), stamp)
                 event = transition(self.previous.get(sid), obs, stamp)
                 if event:
-                    self.events.append({"source_id": sid, **event})
-                    self.dirty = True
+                    self.journal.append({"source_id": sid, **event})
                 current[sid] = obs
             self.previous = current
-            kept = [e for e in self.events if e["observed_at"] >= stamp-30*86400][-3000:]
-            if len(kept) != len(self.events):
-                self.events = kept
-                self.dirty = True
-            if self.dirty:
-                try:
-                    await self.store.async_save({"events": deepcopy(self.events)})
-                    self.dirty = self.save_failed = False
-                except Exception:
-                    self.save_failed = True
-                    _LOGGER.exception("Could not save reported mode observations")
+            try:
+                await self.journal.async_flush(stamp)
+            except Exception:
+                _LOGGER.exception("Could not save reported mode observations")
 
     def overview(self, topology):
-        return {s["id"]: {"recent": deepcopy([e for e in self.events if e["source_id"] == s["id"]][-20:]),
-                          "save_failed": self.save_failed}
-                for s in topology["sources"] if s.get("mode_binding")}
+        return {sid: self.journal.overview(sid)
+                for sid in (s['id'] for s in topology['sources'] if s.get('mode_binding'))}
 
     async def async_stop(self):
         self.closed = True
@@ -87,4 +72,7 @@ class ModeMonitor:
             self.cancel()
             self.cancel = None
         async with self.lock:
-            pass
+            try:
+                await self.journal.async_flush(dt_util.utcnow().timestamp())
+            except Exception:
+                _LOGGER.exception("Final mode journal save failed; pending observations may be lost")
