@@ -454,9 +454,10 @@ class IrpatEfficiencyPanel extends HTMLElement {
       grid.append(this.card("ΔT",fmt(s.delta_t_c,"°C")),
         this.card(this.t("Putere termică măsurată","Measured thermal power"),fmt(s.thermal_measured_w,"W")),
         this.card(this.t("Putere termică calculată","Calculated thermal power"),fmt(s.thermal_calculated_w,"W")),
-        this.card(this.t("Putere electrică","Electrical power"),fmt(s.electrical_w,"W")),
-        this.card(this.t("Raport instantaneu semnat","Signed instantaneous ratio"),fmt(s.signed_power_ratio,"")));
-      box.append(grid,this.node("small",labels[s.cop_status]||s.cop_status,"muted"));
+        this.card(this.t("Putere electrică","Electrical power"),fmt(s.electrical_w,"W")));
+      if(source.source_type==="heat_pump")grid.append(this.card(this.t("Raport instantaneu semnat","Signed instantaneous ratio"),fmt(s.signed_power_ratio,"")));
+      box.append(grid);
+      if(source.source_type==="heat_pump")box.append(this.node("small",labels[s.cop_status]||s.cop_status,"muted"));
     }
     if(this.displayMode==="cooling"){
       box.append(this.node("h3",this.t("Monitorizare condens","Condensation monitoring")));
@@ -842,6 +843,9 @@ class IrpatEfficiencyPanel extends HTMLElement {
         duplicate_position:this.t("Această poziție există deja.","This position already exists."),
         invalid_number:this.t("Verifică valorile numerice.","Check the numeric values."),
         invalid_name:this.t("Introdu un nume valid.","Enter a valid name."),
+        invalid_entity:this.t("Entitate indisponibilă sau unitate incompatibilă.","Entity unavailable or incompatible unit."),
+        invalid_fluid_properties:this.t("Verifică densitatea și căldura specifică.","Check density and specific heat."),
+        invalid_mode_mapping:this.t("Verifică stările exacte ale senzorului.","Check exact sensor states."),
       };
       this.setupError=messages[e?.code]||this.t("Nu s-a putut salva: ","Could not save: ")+String(e?.message||e?.code||"");
       if(e?.code==="configuration_changed") {
@@ -947,6 +951,16 @@ class IrpatEfficiencyPanel extends HTMLElement {
         const checks=areas.map(([id,a])=>{const label=this.node("label",a.name+(d.native_floors[a.floor_id]?" · "+d.native_floors[a.floor_id]:""));const cb=this.node("input");cb.type="checkbox";cb.value=id;cb.checked=true;label.prepend(cb);list.append(label);return cb;});
         f.form.append(list);f.finish();
       }
+      if(t.floors.length>1){
+        const merge=this.node("div",undefined,"setup-item");
+        merge.append(this.node("h3",this.t("Elimină un etaj prin comasare","Remove a floor by merging")),
+          this.node("p",this.t("Alege etajul de păstrat și etajul de eliminat. Camerele și distribuitoarele vor fi mutate; Home Assistant nu este modificat.","Choose the floor to keep and the floor to remove. Rooms and distributors move; Home Assistant is not changed.")));
+        const mf=this.setupForm(merge,this.t("Confirmă comasarea","Confirm merge"),()=>this.setupAction("merge_floor",{id:remove.value,target_id:keep.value,confirmed:true}));
+        const keep=this.setupField(mf.form,this.t("Etaj de păstrat","Floor to keep"),"select","",[["",blank],...floorOptions]);keep.required=true;
+        const remove=this.setupField(mf.form,this.t("Etaj de eliminat","Floor to remove"),"select","",[["",blank]]);remove.required=true;
+        keep.addEventListener("change",()=>{remove.replaceChildren();for(const [id,label] of [["",blank],...floorOptions.filter(x=>x[0]!==keep.value)]){const o=this.node("option",label);o.value=id;remove.append(o);}remove.value="";});
+        mf.finish();section.append(merge);
+      }
       for(const floor of t.floors){
         const row=this.node("div",undefined,"setup-item");row.append(this.node("strong","🏠 "+floor.name));
         const f=this.setupForm(row,this.t("Aplică numele","Apply name"),()=>this.setupAction("rename",{collection:"floors",id:floor.id,name:name.value}));
@@ -1046,6 +1060,56 @@ class IrpatEfficiencyPanel extends HTMLElement {
         const row=this.node("div",undefined,"setup-item");row.append(this.node("strong","♨️ "+source.name+" · "+(types.find(x=>x[0]===source.source_type)?.[1]||source.source_type)));
         const f=this.setupForm(row,this.t("Aplică numele","Apply name"),()=>this.setupAction("rename",{collection:"sources",id:source.id,name:name.value}));
         const name=this.setupField(f.form,this.t("Nume sursă","Source name"),"text",source.name);name.required=true;f.finish();
+        const roles=[
+          ["supply_temperature","Temperatură tur","Supply temperature"],["return_temperature","Temperatură retur","Return temperature"],
+          ["flow","Debit","Flow"],["electrical_power","Putere electrică","Electrical power"],
+          ["electrical_energy","Energie electrică","Electrical energy"],["thermal_power","Putere termică","Thermal power"],
+          ["thermal_energy","Energie termică","Thermal energy"],["compressor","Compresor","Compressor"],
+          ["defrost","Degivrare","Defrost"],["burner","Arzător","Burner"],["pump","Pompă de circulație","Circulation pump"],
+          ["pressure","Presiune","Pressure"]];
+        const entities=d.source_entities||[], bindings=(t.telemetry||[]).filter(b=>b.group==="sources"&&b.owner_id===source.id);
+        const readings=(d.source_readings||[]).filter(b=>b.owner_id===source.id);
+        const sensorBox=this.node("div",undefined,"setup-item");
+        sensorBox.append(this.node("h3",this.t("Senzorii echipamentului","Equipment sensors")),
+          this.node("small",this.t("Selectează entitățile existente; valorile sunt cele raportate la deschiderea formularului. Poți lăsa câmpurile necompletate.","Select existing entities; values are snapshots at form load. Fields can be left blank.")));
+        const fields={};
+        const sf=this.setupForm(sensorBox,this.t("Salvează senzorii","Save sensors"),()=>this.setupAction("source_bindings",{id:source.id,bindings:Object.fromEntries(Object.entries(fields).map(([role,field])=>[role,field.value||null]))}));
+        const isPump=source.source_type==="heat_pump";
+        const tokens=source.name.toLowerCase().split(/[^a-z0-9]+/).filter(x=>x.length>=4);
+        const score=e=>tokens.reduce((n,w)=>n+Number((e.name+" "+e.entity_id).toLowerCase().includes(w)),0);
+        const optionsFor=role=>entities.filter(e=>e.roles.includes(role)).sort((a,b)=>score(b)-score(a)||a.name.localeCompare(b.name))
+          .map(e=>[e.entity_id,(score(e)?"★ ":"")+e.name+" · "+(e.state??"—")+(e.unit?" "+e.unit:"")+" ("+e.entity_id+")"]);
+        for(const [role,ro,en] of roles){
+          const current=bindings.find(b=>b.role===role)?.entity_id||"";
+          if(!current&&((isPump&&role==="burner")||(!isPump&&["compressor","defrost"].includes(role))))continue;
+          const options=[["",this.t("Neasociat","Not linked")],...optionsFor(role)];
+          if(current&&!options.some(x=>x[0]===current))options.push([current,current+" · "+this.t("Verifică entitatea","Review entity")]);
+          fields[role]=this.setupField(sf.form,this.t(ro,en),"select",current,options);
+          const reading=readings.find(x=>x.role===role);
+          if(current)sf.form.append(this.node("small",reading?.status==="reported"?String(reading.value)+(reading.unit?" "+reading.unit:""):this.t("Citire indisponibilă sau invalidă","Unavailable or invalid reading"),"muted"));
+        }
+        sf.finish();row.append(sensorBox);
+        const props=this.node("details",undefined,"remove-confirm");props.append(this.node("summary",this.t("Agent termic și măsurători","Fluid and measurements")));
+        const pf=this.setupForm(props,this.t("Salvează proprietățile","Save properties"),()=>this.setupAction("source_properties",{id:source.id,fluid_type:fluid.value,density_kg_m3:num(density),cp_j_kgk:num(cp),tariff:num(tariff),currency:currency.value||null,power_boundary_confirmed:power.checked,energy_boundary_confirmed:energy.checked}));
+        const fluid=this.setupField(pf.form,this.t("Agent termic","Heat transfer fluid"),"select",source.fluid_type||"unknown",[["unknown",this.t("Necunoscut","Unknown")],["water",this.t("Apă","Water")],["propylene_glycol",this.t("Propilen glicol","Propylene glycol")],["ethylene_glycol",this.t("Etilen glicol","Ethylene glycol")],["other",this.t("Altul","Other")]]);
+        const density=this.setupField(pf.form,this.t("Densitate (kg/m³)","Density (kg/m³)"),"number",source.density_kg_m3??"");
+        const cp=this.setupField(pf.form,this.t("Căldură specifică (J/kg·K)","Specific heat (J/kg·K)"),"number",source.cp_j_kgk??"");
+        const tariff=this.setupField(pf.form,this.t("Tarif electric / kWh","Electric tariff / kWh"),"number",source.tariff??"");
+        const currency=this.setupField(pf.form,this.t("Monedă (RON, EUR)","Currency (RON, EUR)"),"text",source.currency||"");
+        const check=(label,value)=>{const l=this.node("label",label),c=this.node("input");c.type="checkbox";c.checked=value===true;l.prepend(c);pf.form.append(l);return c;};
+        const power=check(this.t("Confirm limitele măsurătorilor de putere","Confirm compatible power boundaries"),source.power_boundary_confirmed);
+        const energy=check(this.t("Confirm limitele contoarelor de energie","Confirm compatible energy boundaries"),source.energy_boundary_confirmed);
+        pf.form.append(this.node("small",this.t("Introdu densitatea și căldura specifică împreună, din datele agentului termic. Confirmă limitele numai dacă măsurătorile sunt compatibile.","Enter density and specific heat together from the fluid data. Confirm boundaries only for compatible measurements."),"muted"));pf.finish();row.append(props);
+        const modes=this.node("details",undefined,"remove-confirm");modes.append(this.node("summary",this.t("Regim de funcționare raportat","Reported operating mode")));
+        const modeFields={}, existing=source.mode_binding||{};
+        const mof=this.setupForm(modes,this.t("Salvează regimurile","Save operating modes"),()=>this.setupAction("source_mode",{id:source.id,entity_id:modeSensor.value||null,states:Object.fromEntries(Object.entries(modeFields).map(([k,v])=>[k,v.value]))}));
+        const modeOptions=[["",this.t("Neasociat","Not linked")],...entities.filter(e=>e.entity_id.startsWith("sensor.")).sort((a,b)=>score(b)-score(a)||a.name.localeCompare(b.name)).map(e=>[e.entity_id,e.name+" · "+(e.state??"—")])];
+        if(existing.entity_id&&!modeOptions.some(x=>x[0]===existing.entity_id))modeOptions.push([existing.entity_id,existing.entity_id]);
+        const modeSensor=this.setupField(mof.form,this.t("Senzor regim","Mode sensor"),"select",existing.entity_id||"",modeOptions);
+        for(const [k,ro,en] of [["heating","Încălzire","Heating"],["cooling","Răcire","Cooling"],["dhw","ACM","Domestic hot water"],["standby","Așteptare","Standby"],["defrost","Degivrare","Defrost"],["off","Oprit","Off"]]){
+          modeFields[k]=this.setupField(mof.form,this.t(ro,en),"text",Object.keys(existing.mapping||{}).find(raw=>existing.mapping[raw]===k)||"");
+        }
+        mof.form.append(this.node("small",this.t("Introdu exact stările raportate de senzor; nu sunt comenzi.","Enter exact reported sensor states; these are not commands."),"muted"));mof.finish();row.append(modes);
         this.setupRemove(row,"sources",source.id,source.name);section.append(row);
       }
       for(const zone of t.zones){

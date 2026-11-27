@@ -11,6 +11,10 @@ from .room_setup import room_candidates
 from .ha_registry_reader import read_structure, read_entities
 from .storage_identity import generation
 from .temperature_reader import read_rooms, read_binding
+from .telemetry import ROLE_GROUPS, BINARY, UNITS, TEMPERATURES, set_binding
+from .telemetry_reader import read_telemetry
+from .source_settings import set_source_settings
+from .operation_mode import configure_mode, MODES
 
 
 def revision(entry):
@@ -38,13 +42,46 @@ def temperature_entities(hass):
     return result
 
 
+def source_entities(hass):
+    """Return eligible sensor candidates, including unavailable registered sensors."""
+    entities = {e["entity_id"]: e for e in read_entities(hass)}
+    for state in hass.states.async_all():
+        entities.setdefault(state.entity_id, {"entity_id": state.entity_id,
+            "name": state.name, "disabled": False})
+    result = []
+    for eid, item in entities.items():
+        if item.get("disabled") or not eid.startswith(("sensor.", "binary_sensor.")):
+            continue
+        state = hass.states.get(eid)
+        unit = state.attributes.get("unit_of_measurement") if state else None
+        roles = []
+        for role in ROLE_GROUPS["sources"]:
+            if role in BINARY:
+                compatible = eid.startswith("binary_sensor.")
+            elif not eid.startswith("sensor."):
+                compatible = False
+            elif unit is None:
+                compatible = True
+            elif role in TEMPERATURES:
+                compatible = unit in ("°C", "°F", "K", "C", "F")
+            else:
+                compatible = unit in UNITS[role][1]
+            if compatible:
+                roles.append(role)
+        result.append({"entity_id": eid, "name": item["name"], "roles": roles,
+                       "state": state.state if state else None, "unit": unit})
+    return result
+
+
 def snapshot(hass, entry):
     topology = entry.options.get("topology", empty_topology())
     floors, areas = read_structure(hass)
     return {"revision": revision(entry), "topology": topology,
             "native_floors": floors, "native_areas": areas,
             "entities": list(temperature_entities(hass).values()),
-            "room_temperatures": read_rooms(hass, topology)}
+            "room_temperatures": read_rooms(hass, topology),
+            "source_entities": source_entities(hass),
+            "source_readings": [s for s in read_telemetry(hass, topology) if s["group"] == "sources"]}
 
 
 def _room_fields(payload):
@@ -186,6 +223,41 @@ def apply_action(hass, topology, action, p):
         data = remove_selection(data, "circuits", [old["id"]], confirmed=True)
         return add_item(data, "circuits", old["name"], manifold_id=old["manifold_id"],
                         position=old["position"], room_id=room_id, length_m=old.get("length_m"))[0]
+    if action == "source_bindings":
+        bindings = p["bindings"]
+        if not isinstance(bindings, dict) or not set(bindings) <= set(ROLE_GROUPS["sources"]):
+            raise TopologyError("invalid_role")
+        candidates = {e["entity_id"]: e for e in source_entities(hass)}
+        current = {b["role"]: b["entity_id"] for b in data.get("telemetry", [])
+                   if b["group"] == "sources" and b["owner_id"] == p["id"]}
+        try:
+            for role, eid in bindings.items():
+                if eid == current.get(role):
+                    continue
+                if eid is not None and (eid not in candidates or role not in candidates[eid]["roles"]):
+                    raise TopologyError("invalid_entity")
+                data = set_binding(data, "sources", p["id"], role, eid)
+        except ValueError as exc:
+            raise TopologyError(str(exc)) from exc
+        return data
+    if action == "source_properties":
+        fields = {k: p[k] for k in ("fluid_type", "density_kg_m3", "cp_j_kgk",
+                  "tariff", "currency", "power_boundary_confirmed", "energy_boundary_confirmed")}
+        try:
+            return set_source_settings(data, p["id"], **fields)
+        except ValueError as exc:
+            raise TopologyError(str(exc)) from exc
+    if action == "source_mode":
+        states = p["states"]
+        if not isinstance(states, dict) or not set(states) <= set(MODES):
+            raise TopologyError("invalid_mode_mapping")
+        eid = p.get("entity_id")
+        if eid and not any(e["entity_id"] == eid for e in source_entities(hass)):
+            raise TopologyError("invalid_entity")
+        try:
+            return configure_mode(data, p["id"], eid, **states)
+        except ValueError as exc:
+            raise TopologyError(str(exc)) from exc
     if action == "add_source":
         zones = p.get("zone_ids", [])
         if not isinstance(zones, list):
