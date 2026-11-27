@@ -14,6 +14,8 @@ from .topology_remove import remove_item
 from .telemetry import ROLE_GROUPS, set_binding
 from .source_settings import FLUID_TYPES, set_source_settings
 from .operation_mode import MODES, configure_mode
+from .ha_registry_reader import read_structure, read_entities
+from .registry_import import import_floor, import_room, import_all, sensor_candidates, confirm_sensors
 
 
 def _choices(values, translation_key):
@@ -33,8 +35,13 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
         self._editing = None
         t = self._topology
         menu = ["floor", "zone", "outdoor"]
-        if t["floors"]:
+        native_floors, native_areas = read_structure(self.hass)
+        if native_floors or native_areas:
+            menu.append("import_structure")
+        if t["floors"] or native_areas:
             menu.append("room")
+        if any(r.get("ha_area_id") in native_areas for r in t["rooms"]):
+            menu.append("discover_sensors")
         if t["zones"]:
             menu.append("source")
         if t["sources"]:
@@ -162,8 +169,93 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
             schema = self.add_suggested_values_to_schema(schema, suggested)
         return self.async_show_form(step_id=step, data_schema=schema, errors=errors)
 
+    def _native_selector(self, choices, multiple=False):
+        return selector.SelectSelector(selector.SelectSelectorConfig(
+            options=[{"value": k, "label": v} for k, v in choices.items()],
+            multiple=multiple, mode=selector.SelectSelectorMode.DROPDOWN,
+        ))
+
     async def async_step_floor(self, user_input=None):
-        return await self._add("floor", "floors", {}, user_input)
+        if self._editing:
+            return await self.async_step_floor_custom(user_input)
+        floors, _ = read_structure(self.hass)
+        if not floors:
+            return await self.async_step_floor_custom()
+        return self.async_show_menu(step_id="floor", menu_options=["floor_existing", "floor_custom"])
+
+    async def async_step_floor_custom(self, user_input=None):
+        return await self._add("floor_custom", "floors", {}, user_input)
+
+    async def async_step_floor_existing(self, user_input=None):
+        floors, _ = read_structure(self.hass)
+        if not floors:
+            return await self.async_step_init()
+        errors = {}
+        if user_input is not None:
+            try:
+                self._topology, _ = import_floor(self._topology, floors, user_input["ha_floor_id"])
+                return await self.async_step_init()
+            except TopologyError as exc:
+                errors["base"] = str(exc)
+        return self.async_show_form(step_id="floor_existing", data_schema=vol.Schema({
+            vol.Required("ha_floor_id"): self._native_selector(floors),
+        }), errors=errors)
+
+    async def async_step_import_structure(self, user_input=None):
+        floors, areas = read_structure(self.hass)
+        if not floors and not areas:
+            return await self.async_step_init()
+        errors = {}
+        if user_input is not None:
+            try:
+                if user_input.get("confirmed") is not True:
+                    raise TopologyError("registry_confirmation_required")
+                self._topology = import_all(self._topology, floors, areas, user_input.get("fallback_floor"))
+                return await self.async_step_init()
+            except TopologyError as exc:
+                errors["base"] = str(exc)
+        fields = {vol.Required("confirmed", default=False): selector.BooleanSelector()}
+        if self._topology["floors"]:
+            fields[vol.Optional("fallback_floor")] = self._reference("floors")
+        return self.async_show_form(step_id="import_structure", data_schema=vol.Schema(fields),
+                                    description_placeholders={"floors": str(len(floors)), "rooms": str(len(areas)),
+                                        "unassigned": str(sum(a.get("floor_id") not in floors for a in areas.values()))},
+                                    errors=errors)
+
+    async def async_step_discover_sensors(self, user_input=None):
+        _, areas = read_structure(self.hass)
+        rooms = {r["id"]: r["name"] for r in self._topology["rooms"] if r.get("ha_area_id") in areas}
+        if not rooms:
+            return await self.async_step_init()
+        if user_input is not None and user_input.get("room_id") in rooms:
+            self._sensor_room = user_input["room_id"]
+            return await self.async_step_confirm_sensors()
+        return self.async_show_form(step_id="discover_sensors", data_schema=vol.Schema({
+            vol.Required("room_id"): self._native_selector(rooms),
+        }), errors={"base": "invalid_reference"} if user_input is not None else {})
+
+    async def async_step_confirm_sensors(self, user_input=None):
+        room_id = self._sensor_room
+        entities = read_entities(self.hass)
+        candidates = sensor_candidates(self._topology, room_id, entities)
+        errors = {}
+        if user_input is not None:
+            try:
+                self._topology = confirm_sensors(self._topology, room_id, entities,
+                                                user_input.get("temperatures", []), user_input.get("humidity"))
+                return await self.async_step_init()
+            except TopologyError as exc:
+                errors["base"] = str(exc)
+        fields = {}
+        if candidates["temperature"]:
+            fields[vol.Optional("temperatures")] = self._native_selector(
+                {k: f"{v} ({k})" for k,v in candidates["temperature"].items()}, multiple=True)
+        if candidates["humidity"]:
+            fields[vol.Optional("humidity")] = self._native_selector(
+                {k: f"{v} ({k})" for k,v in candidates["humidity"].items()})
+        return self.async_show_form(step_id="confirm_sensors", data_schema=vol.Schema(fields),
+                                    description_placeholders={"count": str(sum(map(len, candidates.values())))},
+                                    errors=errors)
 
     async def async_step_zone(self, user_input=None):
         return await self._add("zone", "zones", {
@@ -174,7 +266,37 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
         }, user_input)
 
     async def async_step_room(self, user_input=None):
-        return await self._add("room", "rooms", {
+        if self._editing:
+            return await self.async_step_room_custom(user_input)
+        _, areas = read_structure(self.hass)
+        if not areas:
+            return await self.async_step_room_custom()
+        menu = ["room_existing"]
+        if self._topology["floors"]:
+            menu += ["room_custom"]
+        return self.async_show_menu(step_id="room", menu_options=menu)
+
+    async def async_step_room_existing(self, user_input=None):
+        floors, areas = read_structure(self.hass)
+        if not areas:
+            return await self.async_step_init()
+        errors = {}
+        if user_input is not None:
+            try:
+                self._topology, self._sensor_room = import_room(
+                    self._topology, floors, areas, user_input["ha_area_id"], user_input.get("fallback_floor"))
+                return await self.async_step_confirm_sensors()
+            except TopologyError as exc:
+                errors["base"] = str(exc)
+        choices = {k: v["name"] + " (" + floors[v["floor_id"]] + ")" if v.get("floor_id") in floors else v["name"]
+                   for k,v in areas.items()}
+        fields = {vol.Required("ha_area_id"): self._native_selector(choices)}
+        if self._topology["floors"]:
+            fields[vol.Optional("fallback_floor")] = self._reference("floors")
+        return self.async_show_form(step_id="room_existing", data_schema=vol.Schema(fields), errors=errors)
+
+    async def async_step_room_custom(self, user_input=None):
+        return await self._add("room_custom", "rooms", {
             vol.Required("floor_id"): self._reference("floors"),
             vol.Optional("area_m2"): selector.NumberSelector(selector.NumberSelectorConfig(
                 min=0.1, max=10000, step=0.1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="m²")),
