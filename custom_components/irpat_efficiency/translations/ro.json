@@ -62,7 +62,8 @@
           "manifold": "Adaugă distribuitor",
           "circuit": "Adaugă circuit",
           "binding": "Adaugă senzor ambiental",
-          "save": "Salvează configurația"
+          "save": "Salvează configurația",
+          "outdoor": "Configurează senzor exterior"
         }
       },
       "floor": {
@@ -121,6 +122,13 @@
           "name": "Denumire proprie",
           "room_id": "Încăpere",
           "entity_id": "Senzor sau termostat"
+        }
+      },
+      "outdoor": {
+        "title": "Temperatura exterioară",
+        "description": "Alege senzorul exterior. Lasă câmpul gol pentru a elimina asocierea; apoi salvează configurația.",
+        "data": {
+          "entity_id": "Senzor exterior"
         }
       }
     },
