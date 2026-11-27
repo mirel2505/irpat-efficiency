@@ -56,6 +56,8 @@ def summarize(ledger, first, stop, *, timezone, now, tariff=None):
     """
     if not isinstance(first, date) or not isinstance(stop, date) or first >= stop:
         raise ValueError('invalid_dates')
+    if now < ledger.get('last_end', now):
+        raise ValueError('ledger_after_cutoff')
     start = datetime.combine(first, time.min, timezone).timestamp()
     end = min(datetime.combine(stop, time.min, timezone).timestamp(), int(now)//SLOT*SLOT)
     expected = max(0, end-start)
