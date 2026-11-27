@@ -11,6 +11,8 @@ class IrpatEfficiencyPanel extends HTMLElement {
     this.displayMode = 'heating';
     this.historyHours = '24';
     this.timer = null;
+    this.journalDrafts = new Map();
+    this.journalSaving = false;
   }
 
   set hass(value) {
@@ -30,7 +32,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
   }
 
   async refresh(quiet = false) {
-    if (!this._hass || this.busy) return;
+    if (!this._hass || this.busy || this.journalSaving || (quiet && this.shadowRoot.querySelector('details.journal[open]'))) return;
     this.busy = true;
     if (!quiet) this.render();
     try {
@@ -61,6 +63,92 @@ class IrpatEfficiencyPanel extends HTMLElement {
     return e;
   }
 
+  journalForm(entry, manifold, circuits) {
+    const key = entry.entry_id+":"+manifold.id;
+    const draft = this.journalDrafts.get(key)||{flows:{},phase:"observation",previous_id:"",total:"",source:"",note:"",open:false,message:""};
+    this.journalDrafts.set(key,draft);
+    const box=this.node("details",undefined,"journal");
+    box.open=draft.open;
+    box.append(this.node("summary",this.t("Înregistrează debitele manual","Record manual flow readings")));
+    box.addEventListener("toggle",()=>{if(box.isConnected) draft.open=box.open;});
+    const records=(entry.journal||[]).filter(r=>r.manifold_id===manifold.id).reverse();
+    const previous=this.node("select");
+    previous.append(new Option(this.t("Alege înregistrarea inițială","Choose initial observation"),""));
+    for(const record of records.filter(r=>r.phase==="before")){
+      previous.append(new Option(new Date(record.timestamp).toLocaleString(),record.id));
+    }
+    previous.value=draft.previous_id;
+    previous.addEventListener("change",()=>{draft.previous_id=previous.value;});
+    const phase=this.node("select");
+    for(const [value,ro,en] of [["observation","Observație","Observation"],["before","Înainte de reglaj","Before adjustment"],["after","După reglaj","After adjustment"]]) phase.append(new Option(this.t(ro,en),value));
+    phase.value=draft.phase;
+    const previousLabel=this.node("label",this.t("Înregistrare inițială","Initial observation"));
+    previousLabel.append(previous);
+    previousLabel.hidden=draft.phase!=="after";
+    phase.addEventListener("change",()=>{draft.phase=phase.value;previousLabel.hidden=draft.phase!=="after";if(draft.phase!=="after")draft.previous_id="";});
+    const phaseLabel=this.node("label",this.t("Tip înregistrare","Observation type"));
+    phaseLabel.append(phase);
+    const form=this.node("form");
+    form.append(phaseLabel,previousLabel);
+    const fields=this.node("div",undefined,"flow-fields");
+    const numeric=(caption,value,update)=>{
+      const label=this.node("label",caption);
+      const input=this.node("input");input.type="number";input.min="0";input.step="any";input.value=value??"";
+      input.placeholder="—";
+      input.addEventListener("input",()=>update(input.value));
+      label.append(input);return label;
+    };
+    for(const circuit of circuits) fields.append(numeric(circuit.position+". "+circuit.name+" (l/min)",draft.flows[circuit.id],v=>{draft.flows[circuit.id]=v;}));
+    form.append(fields,numeric(this.t("Debit total distribuitor (l/min)","Manifold total (l/min)"),draft.total,v=>{draft.total=v;}),
+      numeric(this.t("Debit sursă termică (m³/h)","Heat source flow (m³/h)"),draft.source,v=>{draft.source=v;}));
+    const noteLabel=this.node("label",this.t("Observații","Notes"));
+    const note=this.node("textarea");note.maxLength=2000;note.value=draft.note;
+    note.addEventListener("input",()=>{draft.note=note.value;});noteLabel.append(note);form.append(noteLabel);
+    form.append(this.node("p",this.t("Lasă necompletate măsurătorile necunoscute. Introdu doar valori citite fizic. Nu se comandă debitmetrele.","Leave unknown readings blank. Enter physical observations only. Flow meters are not controlled."),"muted"));
+    const save=this.node("button",this.t("Salvează observația","Save observation"));save.type="submit";save.disabled=this.journalSaving||!circuits.length;
+    const message=this.node("p",draft.message,"muted");message.setAttribute("role","status");
+    form.append(save,message);
+    form.addEventListener("submit",async event=>{
+      event.preventDefault();
+      if(this.journalSaving||!this._hass) return;
+      const readings=Object.fromEntries(circuits.filter(c=>draft.flows[c.id]!==undefined&&draft.flows[c.id]!=="").map(c=>[c.id,Number(draft.flows[c.id])]));
+      if(!Object.keys(readings).length|| (draft.phase==="after"&&!draft.previous_id)){
+        message.textContent=this.t("Introdu cel puțin un debit și alege referința pentru reglajul ulterior.","Enter at least one reading and select a reference for an after observation.");return;
+      }
+      const request={type:"irpat_efficiency/journal_append",entry_id:entry.entry_id,manifold_id:manifold.id,readings,phase:draft.phase,note:draft.note};
+      if(draft.phase==="after")request.previous_id=draft.previous_id;
+      if(draft.total!=="")request.manifold_total_lmin=Number(draft.total);
+      if(draft.source!=="")request.source_total_m3h=Number(draft.source);
+      this.journalSaving=true;save.disabled=true;
+      try{
+        await this._hass.callWS(request);
+        this.journalDrafts.delete(key);
+      }catch(error){
+        draft.message=this.t("Salvarea nu a fost confirmată. Verifică jurnalul înainte de a reîncerca.","Save not confirmed. Check journal before retrying.");
+        message.textContent=draft.message;
+        return;
+      }finally{this.journalSaving=false;save.disabled=false;}
+      await this.refresh();
+    });
+    box.append(form);
+    const recent=this.node("div",undefined,"journal-recent");
+    recent.append(this.node("h4",this.t("Ultimele observații","Recent observations")));
+    for(const record of records.slice(0,5)){
+      const row=this.node("div",undefined,"journal-record");
+      const phaseLabel={before:this.t("Înainte","Before"),after:this.t("După","After"),observation:this.t("Observație","Observation")};
+      row.append(this.node("strong",new Date(record.timestamp).toLocaleString()+" · "+(phaseLabel[record.phase]||record.phase)));
+      const labels=new Map(circuits.map(c=>[c.id,c.name]));
+      for(const [id,value] of Object.entries(record.flows_lmin||{}))row.append(this.node("small",(labels.get(id)||this.t("Circuit arhivat","Archived circuit"))+": "+(value==null?"—":value.toFixed(2)+" l/min")));
+      row.append(this.node("small",this.t("Total distribuitor: ","Manifold total: ")+(record.manifold_total_lmin==null?"—":record.manifold_total_lmin.toFixed(2)+" l/min")));
+      row.append(this.node("small",this.t("Debit sursă: ","Source flow: ")+(record.source_total_m3h==null?"—":record.source_total_m3h.toFixed(2)+" m³/h")));
+      if(record.note)row.append(this.node("p",record.note));
+      recent.append(row);
+    }
+    if(!records.length)recent.append(this.node("p",this.t("Nicio observație salvată.","No saved observations."),"muted"));
+    box.append(recent);
+    return box;
+  }
+
   render() {
     const root = this.shadowRoot;
     root.replaceChildren();
@@ -85,6 +173,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       .temperature{text-align:right;flex-shrink:0}.temperature strong{font-size:1.2rem}.temperature small{display:block}
       .mode{display:flex;gap:8px;margin:16px 0}.mode button[aria-pressed="false"]{background:var(--secondary-background-color);color:var(--primary-text-color)}
       .label{overflow-wrap:anywhere}.room{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--divider-color)}
+      .journal{margin:12px 0}.journal form{display:grid;gap:10px;padding:10px 0}.journal label{display:grid;gap:4px;overflow-wrap:anywhere}.journal input,.journal select,.journal textarea{width:100%;box-sizing:border-box;min-width:0;padding:8px;border:1px solid var(--divider-color);border-radius:6px;background:var(--card-background-color);color:var(--primary-text-color);font:inherit}.journal label[hidden]{display:none}.flow-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px}.journal-record{border-top:1px solid var(--divider-color);padding:8px 0}.journal-record small{display:block}.journal-record p{white-space:pre-wrap;overflow-wrap:anywhere}
       @media(max-width:600px){main{padding:12px}}
     `;
     root.append(style);
@@ -183,12 +272,12 @@ class IrpatEfficiencyPanel extends HTMLElement {
             loops.append(loop);
           }
           if (!circuits.length) section.append(this.node("p",this.t("Nu există circuite adăugate.","No circuits added."),"muted"));
-          section.append(loops);
+          section.append(loops,this.journalForm(entry,manifold,circuits));
         }
         main.append(section);
       }
     }
-    main.append(this.node("p",this.t("Temperaturile sunt instantanee (media citirilor disponibile), cu toleranță provizorie ±0,3°C. Vechimea citirilor este afișată, dar nu este încă filtrată automat. Istoricul local eșantionează la 5 minute, păstrează 8 zile și exclude rapoartele HA mai vechi de 2 ore; golurile rămân vizibile. Debitele nu sunt încă disponibile. Nu se transmit comenzi instalației.","Temperatures are snapshots (mean of available readings), with provisional ±0.3°C tolerance. Reading age is shown but not yet automatically filtered. Local history samples every 5 minutes, retains 8 days and excludes HA reports older than 2 hours; gaps remain visible. Flows are not yet available. No commands are sent to equipment."),"muted"));
+    main.append(this.node("p",this.t("Temperaturile sunt instantanee (media citirilor disponibile), cu toleranță provizorie ±0,3°C. Vechimea citirilor este afișată, dar nu este încă filtrată automat. Istoricul local eșantionează la 5 minute, păstrează 8 zile și exclude rapoartele HA mai vechi de 2 ore; golurile rămân vizibile. Debitele se înregistrează manual în jurnal; nu sunt citiri live. Nu se transmit comenzi instalației.","Temperatures are snapshots (mean of available readings), with provisional ±0.3°C tolerance. Reading age is shown but not yet automatically filtered. Local history samples every 5 minutes, retains 8 days and excludes HA reports older than 2 hours; gaps remain visible. Flows are recorded manually in the journal; they are not live readings. No commands are sent to equipment."),"muted"));
     root.append(main);
   }
 }
