@@ -12,10 +12,13 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .history import compare_room, record_samples
-from .temperature_reader import read_rooms
+from .temperature_reader import read_rooms, read_binding
 from .topology import empty_topology
 from .temperature import summarize_room
 from .zone_analysis import zone_diagnostics
+from .weather_history import daily_observations
+
+OUTDOOR_KEY = "__outdoor__"
 
 _LOGGER = logging.getLogger(__name__)
 # Provisional HA state-report freshness limit; not device measurement age.
@@ -47,6 +50,33 @@ class RoomHistory:
         return {mode: zone_diagnostics(topology, self.data, now, journal, since, mode)
                 for mode in ("heating", "cooling")}
 
+    def weather_observations(self, topology):
+        """Produce unreviewed, synchronized weather summaries per zone."""
+        if self.save_failed or self.configuration_hash != self.fingerprint(topology):
+            return {}
+        if not topology.get("outdoor_entity_id") or self.configuration_since is None:
+            return {}
+        now = dt_util.utcnow().timestamp()
+        membership = {}
+        manifolds = {m["id"]: m["zone_id"] for m in topology["manifolds"]}
+        for circuit in topology["circuits"]:
+            room_id = circuit.get("room_id")
+            zone_id = manifolds.get(circuit["manifold_id"])
+            if room_id and zone_id:
+                membership.setdefault(room_id, set()).add(zone_id)
+        result = {}
+        for zone in topology["zones"]:
+            zid = zone["id"]
+            if any(zid in zones and len(zones) > 1 for zones in membership.values()):
+                continue
+            rooms = [{"id": r["id"], "area_m2": r.get("area_m2"),
+                      "target_c": r.get("heating_target_c")}
+                     for r in topology["rooms"] if membership.get(r["id"]) == {zid}]
+            result[zid] = daily_observations(
+                rooms, self.data, self.data.get(OUTDOOR_KEY, {}), now,
+                since=self.configuration_since)
+        return result
+
     async def async_start(self):
         stored = await self.store.async_load()
         if stored is not None:
@@ -77,6 +107,13 @@ class RoomHistory:
                     result = summarize_room(fresh)
                     if result["valid_count"] == len(fresh):
                         values[identifier] = result["temperature_c"]
+            entity_id = topology.get("outdoor_entity_id")
+            if entity_id:
+                reading = read_binding(self.hass, {"entity_id": entity_id, "name": "Outdoor"})
+                if (reading.get("age_seconds") is not None
+                        and reading["age_seconds"] <= MAX_REPORT_AGE_SECONDS
+                        and reading["temperature_c"] is not None):
+                    values[OUTDOOR_KEY] = reading["temperature_c"]
             record_samples(self.data, dt_util.utcnow().timestamp(), values)
             try:
                 await self.store.async_save({"rooms": deepcopy(self.data),
