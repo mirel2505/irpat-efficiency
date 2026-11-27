@@ -22,6 +22,11 @@ function runPanelTests(source) {
   checks.push(equal(instance.recordedFlow(entry,mid,cid),{value:null,timestamp:latest},"negative value excluded"));
   entry.journal[0].timestamp="invalid";
   checks.push(equal(instance.recordedFlow(entry,mid,cid),{value:1.4,timestamp:old},"invalid timestamp excluded"));
+  const circuits=[{id:"a"},{id:"b"}];
+  checks.push(equal(instance.flowSummary(circuits,{a:"1.2",b:"0"}),{count:2,total:1.2,complete:true},"complete sum includes closed loop"));
+  checks.push(equal(instance.flowSummary(circuits,{a:"1.2",b:""}),{count:1,total:1.2,complete:false},"partial sum is not total"));
+  checks.push(equal(instance.journalFlowValue({state:"25",attributes:{unit_of_measurement:"L/min"}}),1.5,"source flow conversion"));
+  checks.push(equal(instance.journalFlowValue({state:"unavailable",attributes:{unit_of_measurement:"m³/h"}}),null,"unavailable flow is not zero"));
   return checks;
 }
 const source=readFileSync(new URL("../custom_components/irpat_efficiency/frontend/panel.js",import.meta.url),"utf8");

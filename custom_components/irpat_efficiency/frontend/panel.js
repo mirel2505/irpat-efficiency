@@ -83,6 +83,19 @@ class IrpatEfficiencyPanel extends HTMLElement {
     return e;
   }
 
+  flowSummary(circuits, flows) {
+    const values=circuits.map(c=>flows[c.id]).filter(v=>v!==undefined&&v!==null&&String(v).trim()!==""&&Number.isFinite(Number(v))&&Number(v)>=0).map(Number);
+    return {count:values.length,total:values.reduce((a,b)=>a+b,0),complete:circuits.length>0&&values.length===circuits.length};
+  }
+
+  journalFlowValue(state) {
+    const factors={"m³/h":1,"m3/h":1,"L/min":0.06,"l/min":0.06,"L/h":0.001,"l/h":0.001};
+    const unit=state?.attributes?.unit_of_measurement,raw=state?.state;
+    if(!Object.prototype.hasOwnProperty.call(factors,unit)||raw==null||String(raw).trim()==="")return null;
+    const value=Number(raw)*factors[unit];
+    return Number.isFinite(value)&&value>=0?value:null;
+  }
+
   journalForm(entry, manifold, circuits) {
     const key = entry.entry_id+":"+manifold.id;
     const draft = this.journalDrafts.get(key)||{flows:{},phase:"observation",previous_id:"",total:"",source:"",note:"",open:false,message:""};
@@ -118,9 +131,45 @@ class IrpatEfficiencyPanel extends HTMLElement {
       input.addEventListener("input",()=>update(input.value));
       label.append(input);return label;
     };
-    for(const circuit of circuits) fields.append(numeric(circuit.position+". "+circuit.name+" (l/min)",draft.flows[circuit.id],v=>{draft.flows[circuit.id]=v;}));
-    form.append(fields,numeric(this.t("Debit total distribuitor (l/min)","Manifold total (l/min)"),draft.total,v=>{draft.total=v;}),
-      numeric(this.t("Debit sursă termică (m³/h)","Heat source flow (m³/h)"),draft.source,v=>{draft.source=v;}));
+    const totalLabel=this.node("label",this.t("Debit total distribuitor (l/min)","Manifold total (l/min)"));
+    const total=this.node("input");total.type="text";total.readOnly=true;total.placeholder="—";
+    const coverage=this.node("small",undefined,"muted");
+    totalLabel.append(total,coverage);
+    const updateTotal=()=>{
+      const sum=this.flowSummary(circuits,draft.flows);
+      total.value=sum.count?sum.total.toFixed(2):"";
+      coverage.textContent=sum.count+"/"+circuits.length+" · "+(sum.complete?this.t("Total calculat automat","Automatically calculated total"):this.t("Sumă parțială — nu este totalul distribuitorului","Partial sum — not manifold total"));
+    };
+    for(const circuit of circuits){
+      const room=entry.topology?.rooms?.find(r=>r.id===circuit.room_id);
+      const caption=circuit.position+". "+(room?.name||circuit.name)+" (l/min)";
+      fields.append(numeric(caption,draft.flows[circuit.id],v=>{draft.flows[circuit.id]=v;updateTotal();}));
+    }
+    updateTotal();form.append(fields,totalLabel);
+    const methodLabel=this.node("label",this.t("Debit sursă termică — metodă","Heat source flow — method"));
+    const method=this.node("select");
+    method.append(new Option(this.t("Introducere manuală","Manual entry"),"manual"),new Option(this.t("Senzor Home Assistant","Home Assistant sensor"),"sensor"));
+    method.value=draft.sourceMethod||"manual";methodLabel.append(method);form.append(methodLabel);
+    const manual=numeric(this.t("Debit sursă termică (m³/h)","Heat source flow (m³/h)"),draft.source,v=>{draft.source=v;});
+    const sensorLabel=this.node("label",this.t("Entitate debit sursă","Source flow entity"));
+    const select=this.node("select");select.append(new Option(this.t("Alege entitatea…","Choose entity…"),""));
+    const linkedIds=new Set((entry.topology?.telemetry||[]).filter(b=>b.group==="sources"&&b.role==="flow"&&entry.topology.sources.some(s=>s.id===b.owner_id&&s.zone_ids?.includes(manifold.zone_id))).map(b=>b.entity_id));
+    const units=["m³/h","m3/h","L/min","l/min","L/h","l/h"];
+    const candidates=Object.entries(this._hass?.states||{}).filter(([id,s])=>id.startsWith("sensor.")&&(linkedIds.has(id)||units.includes(s.attributes?.unit_of_measurement)));
+    for(const [id,s] of candidates.sort((a,b)=>Number(linkedIds.has(b[0]))-Number(linkedIds.has(a[0]))||a[0].localeCompare(b[0])))
+      select.append(new Option((linkedIds.has(id)?"★ ":"")+(s.attributes?.friendly_name||id)+" ("+id+")",id));
+    if(draft.sourceEntity&&!candidates.some(([id])=>id===draft.sourceEntity))select.append(new Option(draft.sourceEntity,draft.sourceEntity));
+    select.value=draft.sourceEntity||(linkedIds.size===1&&candidates.some(([id])=>linkedIds.has(id))?[...linkedIds][0]:"");
+    const preview=this.node("small",undefined,"muted");
+    sensorLabel.append(select,preview);
+    const updateSource=()=>{
+      draft.sourceMethod=method.value;draft.sourceEntity=select.value;
+      manual.hidden=method.value!=="manual";sensorLabel.hidden=method.value!=="sensor";
+      const value=this.journalFlowValue(this._hass?.states?.[select.value]);
+      preview.textContent=(value==null?this.t("Citire indisponibilă","Reading unavailable"):value.toFixed(3)+" m³/h")+" · "+this.t("Citirea este verificată și preluată la salvare.","Reading is validated and captured on save.");
+    };
+    method.addEventListener("change",updateSource);select.addEventListener("change",updateSource);
+    updateSource();form.append(manual,sensorLabel);
     const noteLabel=this.node("label",this.t("Observații","Notes"));
     const note=this.node("textarea");note.maxLength=2000;note.value=draft.note;
     note.addEventListener("input",()=>{draft.note=note.value;});noteLabel.append(note);form.append(noteLabel);
@@ -137,14 +186,19 @@ class IrpatEfficiencyPanel extends HTMLElement {
       }
       const request={type:"irpat_efficiency/journal_append",entry_id:entry.entry_id,manifold_id:manifold.id,readings,phase:draft.phase,note:draft.note};
       if(draft.phase==="after")request.previous_id=draft.previous_id;
-      if(draft.total!=="")request.manifold_total_lmin=Number(draft.total);
-      if(draft.source!=="")request.source_total_m3h=Number(draft.source);
+      // The server calculates the manifold total only from complete readings.
+      if(draft.sourceMethod==="sensor"){
+        if(!draft.sourceEntity){message.textContent=this.t("Alege senzorul de debit.","Choose a flow sensor.");return;}
+        request.source_flow_entity_id=draft.sourceEntity;
+      }else if(draft.source!=="")request.source_total_m3h=Number(draft.source);
       this.journalSaving=true;save.disabled=true;
       try{
         await this._hass.callWS(request);
         this.journalDrafts.delete(key);
       }catch(error){
-        draft.message=this.t("Salvarea nu a fost confirmată. Verifică jurnalul înainte de a reîncerca.","Save not confirmed. Check journal before retrying.");
+        draft.message=error?.code==="invalid_observation"&&String(error.message).includes("source_flow")?
+          this.t("Senzorul de debit este indisponibil, prea vechi sau incompatibil. Verifică-l ori alege introducerea manuală.","Flow sensor is unavailable, stale or incompatible. Review it or choose manual entry."):
+          this.t("Salvarea nu a fost confirmată. Verifică jurnalul înainte de a reîncerca.","Save not confirmed. Check journal before retrying.");
         message.textContent=draft.message;
         return;
       }finally{this.journalSaving=false;save.disabled=false;}
@@ -161,6 +215,9 @@ class IrpatEfficiencyPanel extends HTMLElement {
       for(const [id,value] of Object.entries(record.flows_lmin||{}))row.append(this.node("small",(labels.get(id)||this.t("Circuit arhivat","Archived circuit"))+": "+(value==null?"—":value.toFixed(2)+" l/min")));
       row.append(this.node("small",this.t("Total distribuitor: ","Manifold total: ")+(record.manifold_total_lmin==null?"—":record.manifold_total_lmin.toFixed(2)+" l/min")));
       row.append(this.node("small",this.t("Debit sursă: ","Source flow: ")+(record.source_total_m3h==null?"—":record.source_total_m3h.toFixed(2)+" m³/h")));
+      const sourceInfo=record.context?.source_flow;
+      if(sourceInfo?.method==="sensor")row.append(this.node("small",this.t("Senzor: ","Sensor: ")+sourceInfo.entity_id,"muted"));
+      else if(sourceInfo?.method==="manual")row.append(this.node("small",this.t("Debit sursă introdus manual","Source flow entered manually"),"muted"));
       if(record.note)row.append(this.node("p",record.note));
       recent.append(row);
     }

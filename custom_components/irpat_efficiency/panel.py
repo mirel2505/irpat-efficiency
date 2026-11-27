@@ -145,6 +145,7 @@ def ws_overview(hass, connection, msg):
     vol.Optional("previous_id"): str,
     vol.Optional("manifold_total_lmin"): vol.Any(int, float),
     vol.Optional("source_total_m3h"): vol.Any(int, float),
+    vol.Optional("source_flow_entity_id"): str,
     vol.Optional("note", default=""): vol.All(str, vol.Length(max=2000)),
 })
 @websocket_api.require_admin
@@ -163,11 +164,26 @@ async def ws_journal_append(hass, connection, msg):
     context = {"room_temperatures": rooms, "zone": zone,
                "telemetry": read_telemetry(hass, topology)}
     try:
+        source_total = msg.get("source_total_m3h")
+        source_entity = msg.get("source_flow_entity_id")
+        if source_entity is not None:
+            if source_total is not None or not source_entity.startswith("sensor."):
+                raise ValueError("invalid_source_flow")
+            sample = read_telemetry(hass, {"telemetry": [{
+                "group": "sources", "owner_id": "journal", "role": "flow",
+                "entity_id": source_entity}]})[0]
+            if sample["status"] != "reported" or sample["value"] is None:
+                raise ValueError("unavailable_source_flow")
+            source_total = sample["value"]
+            context["source_flow"] = {"method": "sensor", "entity_id": source_entity,
+                "value_m3h": source_total, "reported_at": sample["timestamp"]}
+        elif source_total is not None:
+            context["source_flow"] = {"method": "manual", "value_m3h": source_total}
         result = await journal.async_append(
             topology, msg["manifold_id"], msg["readings"],
             phase=msg["phase"], previous_id=msg.get("previous_id"),
             manifold_total_lmin=msg.get("manifold_total_lmin"),
-            source_total_m3h=msg.get("source_total_m3h"),
+            source_total_m3h=source_total,
             note=msg["note"], context=context,
         )
     except ValueError as exc:
