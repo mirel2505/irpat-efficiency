@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 EXPORT_VERSION = 1
 MAX_BYTES = 4 * 1024 * 1024
 CSV_SECTIONS = ('temperatures', 'energy', 'hydraulics', 'profiles', 'observations',
-                'comparisons', 'defrost', 'modes')
+                'comparisons', 'defrost', 'modes', 'fuel')
 
 
 def capture(entry_id, name, topology, runtime, now):
@@ -30,11 +30,13 @@ def capture(entry_id, name, topology, runtime, now):
                                 'configuration_since': history.configuration_since,
                                 'matches_current_configuration': history.configuration_hash == history.fingerprint(topology)},
         'energy_history': energy.history.data,
+        'fuel': energy.fuel.export() if getattr(energy, 'fuel', None) else [],
         'hydraulics': get('journals').entries, 'profiles': get('profiles').profiles,
         'observations': reports['observations'], 'comparisons': reports['reports'],
         'defrost': defrost.committed, 'modes': modes.committed,
         'storage_status': {'temperature_save_failed': history.save_failed,
                            'energy_save_failed': energy.save_failed,
+                           'fuel_save_failed': getattr(energy, 'fuel_save_failed', False),
                            'defrost_save_failed': defrost.save_failed,
                            'mode_save_failed': modes.save_failed,
                            'defrost_pending_excluded': len(defrost.pending),
@@ -89,7 +91,7 @@ def _rows(snapshot, section):
             for cid, flow in record['flows_lmin'].items():
                 yield {**base, 'circuit_id': cid, 'flow_lmin': flow}
     else:
-        yield from snapshot[section]
+        yield from snapshot.get(section, [])
 
 
 def serialize(snapshot, format, section=None):
