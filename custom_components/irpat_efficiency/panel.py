@@ -33,7 +33,8 @@ def ws_overview(hass, connection, msg):
                          "journal": journal.recent() if journal else [],
                          "room_temperatures": read_rooms(hass, topology),
                          "history": history.overview(topology) if history else {},
-                         "history_save_failed": history.save_failed if history else False})
+                         "history_save_failed": history.save_failed if history else False,
+                         "thermal_diagnostics": history.diagnostics(topology, journal.entries) if history and journal else {}})
     connection.send_result(msg["id"], overview)
 
 
