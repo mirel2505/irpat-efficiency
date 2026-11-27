@@ -13,10 +13,10 @@ from .const import DOMAIN
 from .history import compare_room
 from .history_persistence import current_series, save_sample
 from .temperature_reader import MAX_REPORT_AGE_SECONDS, read_rooms, read_binding
-from .topology import empty_topology, temperature_conflicts
+from .topology import empty_topology
 from .temperature import summarize_room
 from .zone_analysis import zone_diagnostics
-from .weather_history import daily_observations
+from .thermal_review import zone_weather
 
 OUTDOOR_KEY = "__outdoor__"
 
@@ -52,31 +52,8 @@ class RoomHistory:
         """Produce unreviewed, synchronized weather summaries per zone."""
         if self.save_failed or self.configuration_hash != self.fingerprint(topology):
             return {}
-        if not topology.get("outdoor_entity_id") or self.configuration_since is None:
-            return {}
-        now = dt_util.utcnow().timestamp()
-        membership = {}
-        manifolds = {m["id"]: m["zone_id"] for m in topology["manifolds"]}
-        for circuit in topology["circuits"]:
-            room_id = circuit.get("room_id")
-            zone_id = manifolds.get(circuit["manifold_id"])
-            if room_id and zone_id:
-                membership.setdefault(room_id, set()).add(zone_id)
-        result = {}
-        conflicts = temperature_conflicts(topology)
-        for zone in topology["zones"]:
-            zid = zone["id"]
-            if any(zid in zones and len(zones) > 1 for zones in membership.values()):
-                continue
-            rooms = [{"id": r["id"], "area_m2": r.get("area_m2"),
-                      "target_c": r.get("heating_target_c")}
-                     for r in topology["rooms"] if membership.get(r["id"]) == {zid}]
-            if conflicts.intersection(r["id"] for r in rooms):
-                continue
-            result[zid] = daily_observations(
-                rooms, self.data, self.data.get(OUTDOOR_KEY, {}), now,
-                since=self.configuration_since)
-        return result
+        return zone_weather(topology, self.data, dt_util.utcnow().timestamp(),
+                            self.configuration_since)
 
     async def async_start(self):
         stored = await self.store.async_load()
