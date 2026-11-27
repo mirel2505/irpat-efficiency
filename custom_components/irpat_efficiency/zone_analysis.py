@@ -3,6 +3,7 @@ from datetime import datetime
 from .calculations import balancing_capability
 from .history import bucket
 from .thermal_balance import analyze_zone
+from .stability import stability
 
 
 def zone_diagnostics(topology, series, now, journal, configuration_since, mode):
@@ -36,6 +37,10 @@ def zone_diagnostics(topology, series, now, journal, configuration_since, mode):
         else:
             result = analyze_zone(rooms, series, start, end,
                                   eligible=capability != "monitor_only", last_adjustment=last)
+        result["stability"] = stability(
+            rooms, series, end, eligible=capability != "monitor_only" and not shared,
+            configuration_since=configuration_since, last_adjustment=last,
+        )
         result.update(zone_id=zid, name=zone["name"], capability=capability,
                       shared_room_ids=shared, mode=mode, window_hours=24,
                       advisory_only=True)
