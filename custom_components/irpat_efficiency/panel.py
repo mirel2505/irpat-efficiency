@@ -33,10 +33,12 @@ def ws_overview(hass, connection, msg):
         history = hass.data[DOMAIN]["histories"].get(entry.entry_id)
         journal = hass.data[DOMAIN]["journals"].get(entry.entry_id)
         profiles = hass.data[DOMAIN]["profiles"].get(entry.entry_id)
+        monitor = hass.data[DOMAIN]["defrost_monitors"].get(entry.entry_id)
         rooms = read_rooms(hass, topology)
         telemetry = read_telemetry(hass, topology)
         overview.append({"entry_id": entry.entry_id, "name": entry.title, "topology": topology,
                          "profiles": profiles.list_profiles() if profiles else [],
+                         "defrost": monitor.overview(topology) if monitor else {},
                          "journal": journal.recent() if journal else [],
                          "room_temperatures": rooms,
                          "telemetry": telemetry,
