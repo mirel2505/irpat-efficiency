@@ -107,7 +107,8 @@
           "telemetry_manifolds": "Manifold sensors",
           "source_settings": "Source properties and tariff",
           "mode_source": "Reported source mode",
-          "edit": "Edit existing configuration"
+          "edit": "Edit existing configuration",
+          "remove": "Remove configuration object"
         }
       },
       "floor": {
@@ -269,6 +270,20 @@
           "length_m": "Circuit length",
           "entity_id": "Sensor or thermostat"
         }
+      },
+      "remove": {
+        "title": "Choose object type to remove",
+        "data": {
+          "collection": "Object type"
+        }
+      },
+      "remove_item": {
+        "title": "Confirm removal",
+        "description": "This removes only the configuration object and its own telemetry associations. Dependent objects must be removed separately. Stored history is not explicitly erased; normal retention still applies. Changes apply only after Save configuration.",
+        "data": {
+          "item_id": "Object",
+          "confirmed": "Confirm removal from configuration"
+        }
       }
     },
     "error": {
@@ -288,7 +303,9 @@
       "invalid_tariff": "Invalid tariff or currency code.",
       "invalid_boundary": "Invalid confirmation.",
       "invalid_mode_mapping": "Provide at least one valid, distinct raw state value.",
-      "unsupported_edit": "This structural change requires a new object."
+      "unsupported_edit": "This structural change requires a new object.",
+      "object_in_use": "Other configuration objects depend on this object. Remove dependencies first.",
+      "remove_confirmation_required": "Explicit confirmation is required."
     }
   }
 }
