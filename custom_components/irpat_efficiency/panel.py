@@ -10,6 +10,7 @@ import voluptuous as vol
 from .const import DOMAIN
 from .topology import empty_topology
 from .temperature_reader import read_rooms
+from .telemetry_reader import read_telemetry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,6 +35,7 @@ def ws_overview(hass, connection, msg):
                          "profiles": profiles.list_profiles() if profiles else [],
                          "journal": journal.recent() if journal else [],
                          "room_temperatures": read_rooms(hass, topology),
+                         "telemetry": read_telemetry(hass, topology),
                          "history": history.overview(topology) if history else {},
                          "history_save_failed": history.save_failed if history else False,
                          "thermal_diagnostics": history.diagnostics(topology, journal.entries) if history and journal else {},
@@ -65,7 +67,8 @@ async def ws_journal_append(hass, connection, msg):
     rooms = read_rooms(hass, topology)
     manifold = next((m for m in topology["manifolds"] if m["id"] == msg["manifold_id"]), None)
     zone = next((z for z in topology["zones"] if manifold and z["id"] == manifold["zone_id"]), None)
-    context = {"room_temperatures": rooms, "zone": zone}
+    context = {"room_temperatures": rooms, "zone": zone,
+               "telemetry": read_telemetry(hass, topology)}
     try:
         result = await journal.async_append(
             topology, msg["manifold_id"], msg["readings"],
