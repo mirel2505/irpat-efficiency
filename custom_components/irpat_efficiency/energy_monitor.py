@@ -30,7 +30,9 @@ class EnergyMonitor:
     @staticmethod
     def meter_samples(topology, telemetry):
         sources = {s["id"] for s in topology["sources"]}
-        return {s["owner_id"]: {**s, "pair_signature": pair_signature(topology, s["owner_id"])}
+        fuel_meters = {s.get("fuel", {}).get("meter_entity") for s in topology["sources"]}
+        return {s["owner_id"]: {**s, "pair_signature": pair_signature(topology, s["owner_id"]),
+                                **({"blocked": True} if s["entity_id"] in fuel_meters else {})}
                 for s in telemetry
                 if s["group"] == "sources" and s["role"] == "electrical_energy"
                 and s["owner_id"] in sources}
