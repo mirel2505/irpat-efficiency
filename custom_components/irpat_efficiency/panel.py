@@ -29,7 +29,9 @@ def ws_overview(hass, connection, msg):
         topology = entry.options.get("topology", empty_topology())
         history = hass.data[DOMAIN]["histories"].get(entry.entry_id)
         journal = hass.data[DOMAIN]["journals"].get(entry.entry_id)
+        profiles = hass.data[DOMAIN]["profiles"].get(entry.entry_id)
         overview.append({"entry_id": entry.entry_id, "name": entry.title, "topology": topology,
+                         "profiles": profiles.list_profiles() if profiles else [],
                          "journal": journal.recent() if journal else [],
                          "room_temperatures": read_rooms(hass, topology),
                          "history": history.overview(topology) if history else {},
@@ -81,6 +83,40 @@ async def ws_journal_append(hass, connection, msg):
     connection.send_result(msg["id"], result)
 
 
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/profile_create",
+    vol.Required("entry_id"): str,
+    vol.Required("zone_id"): str,
+    vol.Required("name"): vol.All(str, vol.Length(min=1, max=120)),
+    vol.Required("mode"): vol.In(("heating", "cooling")),
+    vol.Required("snapshot_ids"): [str],
+})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_profile_create(hass, connection, msg):
+    """Persist a manual profile from existing journal observations."""
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    runtime = hass.data.get(DOMAIN, {})
+    profiles = runtime.get("profiles", {}).get(msg["entry_id"])
+    journal = runtime.get("journals", {}).get(msg["entry_id"])
+    if entry is None or entry.domain != DOMAIN or profiles is None or journal is None:
+        connection.send_error(msg["id"], "not_found", "No active profile store")
+        return
+    try:
+        result = await profiles.async_create(
+            entry.options.get("topology", empty_topology()), msg["zone_id"], msg["name"],
+            msg["mode"], msg["snapshot_ids"], journal.entries,
+        )
+    except ValueError as exc:
+        connection.send_error(msg["id"], "invalid_profile", str(exc))
+        return
+    except Exception:
+        _LOGGER.exception("Could not save reference profile")
+        connection.send_error(msg["id"], "save_failed", "Profile save failed")
+        return
+    connection.send_result(msg["id"], result)
+
+
 async def async_register(hass):
     """Register the API and static asset once per HA runtime."""
     runtime = hass.data[DOMAIN]
@@ -92,6 +128,7 @@ async def async_register(hass):
     if not runtime.get("api_registered"):
         websocket_api.async_register_command(hass, ws_overview)
         websocket_api.async_register_command(hass, ws_journal_append)
+        websocket_api.async_register_command(hass, ws_profile_create)
         runtime["api_registered"] = True
     if not runtime.get("panel_registered"):
         await panel_custom.async_register_panel(
