@@ -98,6 +98,14 @@ def run_case(browser, language, width, dark):
     panel = page.locator("irpat-efficiency-panel")
     expect(panel.get_by_role("heading", name="Test installation", exact=True)).to_be_visible()
     expect(panel.get_by_text("21.5 °C", exact=True)).to_be_visible()
+    expect(panel.get_by_text("dev3", exact=True)).to_be_visible()
+    expect(panel.locator(".room-tile")).to_have_attribute("data-status", "cold")
+    assert panel.locator(".room-tile").bounding_box()["height"] <= 88, "Closed room tile too tall"
+    assert panel.locator(".comfort-grid").evaluate("(e) => getComputedStyle(e).gridTemplateColumns.split(\' \').length") == 3
+    assert panel.locator(".room-tile .room-detail").evaluate("(e) => !e.open")
+    panel.locator(".room-tile .room-detail > summary").click()
+    expect(panel.get_by_role("button", name=word("Aplică ținta","Apply target"), exact=True)).to_be_visible()
+    panel.locator(".room-tile .room-detail > summary").click()
     expect(panel.get_by_role("heading", name=word("Echilibrul casei","Home comfort"), exact=True)).to_be_visible()
     expect(panel.get_by_role("heading", name=word("Următorul pas","Next step"), exact=True)).to_be_visible()
     expect(panel.get_by_text(word("Setează ținta pentru toate camerele","Set a target for all rooms"), exact=True)).to_be_visible()
