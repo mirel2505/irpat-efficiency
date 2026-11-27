@@ -130,7 +130,7 @@
     "step": {
       "init": {
         "title": "System configuration",
-        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nUnapplied draft: {pending} (1 = yes, 0 = no). Completed steps are saved locally. Select Save configuration to apply.",
+        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nConfirmed steps are saved and applied automatically. You can close this menu at any time.",
         "menu_options": {
           "floor": "Add or select floor",
           "zone": "Add hydraulic zone (shared water-temperature regime)",
@@ -139,7 +139,7 @@
           "manifold": "Add distributor (manifold)",
           "circuit": "Add circuit",
           "binding": "Add room sensor",
-          "save": "Save configuration",
+          "save": "Done",
           "outdoor": "Configure outdoor sensor",
           "telemetry_rooms": "Room sensors",
           "telemetry_sources": "Heat source sensors",
@@ -222,7 +222,7 @@
       },
       "outdoor": {
         "title": "Outdoor temperature",
-        "description": "Select the outdoor sensor. Leave blank to remove the association, then save the configuration.",
+        "description": "Select the outdoor sensor. Leave blank and confirm to remove the association.",
         "data": {
           "entity_id": "Outdoor sensor"
         }
@@ -443,30 +443,30 @@
       },
       "building_menu": {
         "title": "1. Building and outdoor temperature",
-        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nUnapplied draft: {pending} (1 = yes, 0 = no). Completed steps are saved locally. Select Save configuration to apply.",
+        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nConfirmed steps are saved and applied automatically. You can close this menu at any time.",
         "menu_options": {
           "floor": "Add or select floor",
           "import_structure": "Import Home Assistant floors and areas",
           "outdoor": "Configure outdoor sensor",
           "overview_menu": "Back to configuration overview",
-          "save": "Save configuration"
+          "save": "Done"
         }
       },
       "hydraulics_menu": {
         "title": "2. Heating circuits and distributors",
-        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nUnapplied draft: {pending} (1 = yes, 0 = no). Completed steps are saved locally. Select Save configuration to apply.",
+        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nConfirmed steps are saved and applied automatically. You can close this menu at any time.",
         "menu_options": {
           "zone": "Add hydraulic zone (shared water-temperature regime)",
           "manifold": "Add distributor (manifold)",
           "circuit": "Add circuit",
           "telemetry_manifolds": "Distributor sensors",
           "overview_menu": "Back to configuration overview",
-          "save": "Save configuration"
+          "save": "Done"
         }
       },
       "rooms_menu": {
         "title": "3. Rooms and sensors",
-        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nUnapplied draft: {pending} (1 = yes, 0 = no). Completed steps are saved locally. Select Save configuration to apply.",
+        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nConfirmed steps are saved and applied automatically. You can close this menu at any time.",
         "menu_options": {
           "room": "Add or select room",
           "room_setup": "Complete existing room (sensors and circuits)",
@@ -474,12 +474,12 @@
           "binding": "Add room sensor",
           "telemetry_rooms": "Room sensors",
           "overview_menu": "Back to configuration overview",
-          "save": "Save configuration"
+          "save": "Done"
         }
       },
       "sources_menu": {
         "title": "4. Heat sources and costs",
-        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nUnapplied draft: {pending} (1 = yes, 0 = no). Completed steps are saved locally. Select Save configuration to apply.",
+        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nConfirmed steps are saved and applied automatically. You can close this menu at any time.",
         "menu_options": {
           "source": "Add heat source",
           "source_settings": "Source properties and tariff",
@@ -488,24 +488,24 @@
           "economic_source": "Fuel and economic scenarios",
           "hybrid_zone": "Hybrid operating strategy",
           "overview_menu": "Back to configuration overview",
-          "save": "Save configuration"
+          "save": "Done"
         }
       },
       "manage_menu": {
         "title": "5. Edit or remove",
-        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nUnapplied draft: {pending} (1 = yes, 0 = no). Completed steps are saved locally. Select Save configuration to apply.",
+        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nConfirmed steps are saved and applied automatically. You can close this menu at any time.",
         "menu_options": {
           "edit": "Edit existing configuration",
           "remove": "Remove one or more objects",
           "discard_draft": "Discard draft (keep saved configuration)",
           "overview_menu": "Back to configuration overview",
-          "save": "Save configuration",
+          "save": "Done",
           "beta_reset": "Reset entire configuration (Beta)"
         }
       },
       "all_actions": {
         "title": "Expert – all configuration actions",
-        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nUnapplied draft: {pending} (1 = yes, 0 = no). Completed steps are saved locally. Select Save configuration to apply.",
+        "description": "Configured: {floors} floors, {rooms} rooms, {zones} hydraulic zones, {manifolds} distributors, {circuits} circuits, {sources} sources.\nRooms without temperature bindings: {missing_sensors}. Rooms without mapped circuits: {missing_circuits} (some rooms may be unheated).\nConfirmed steps are saved and applied automatically. You can close this menu at any time.",
         "menu_options": {
           "floor": "Add or select floor",
           "zone": "Add hydraulic zone (shared water-temperature regime)",
@@ -514,7 +514,7 @@
           "manifold": "Add distributor (manifold)",
           "circuit": "Add circuit",
           "binding": "Add room sensor",
-          "save": "Save configuration",
+          "save": "Done",
           "outdoor": "Configure outdoor sensor",
           "telemetry_rooms": "Room sensors",
           "telemetry_sources": "Heat source sensors",
@@ -605,7 +605,8 @@
     "abort": {
       "draft_conflict": "Configuration or draft changed in another session. Reopen Configure to continue from the latest checkpoint.",
       "draft_read_failed": "Could not read configuration draft. Check Home Assistant logs before retrying.",
-      "draft_write_failed": "Could not save the latest draft step. Previous saved checkpoints remain; check logs."
+      "draft_write_failed": "Could not save the latest draft step. Previous saved checkpoints remain; check logs.",
+      "autosave_reload_failed": "Configuration was saved, but irPaT could not reload. Check the logs and reload the integration."
     }
   }
 }

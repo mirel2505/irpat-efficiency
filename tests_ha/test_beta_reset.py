@@ -65,13 +65,14 @@ async def test_beta_reset_fresh_session(hass, enable_custom_integrations, hass_w
     result = await manager.async_configure(fid, {"confirmation":"RESET", "confirmed":True, "cancel":True})
     assert result["step_id"] == "manage_menu"
     assert entry.options["topology"] == t
-    # Create a real saved draft before reset.
+    # Create a confirmed, automatically saved change before reset.
     result = await manager.async_configure(fid, {"next_step_id":"overview_menu"})
     result = await manager.async_configure(fid, {"next_step_id":"building_menu"})
     result = await manager.async_configure(fid, {"next_step_id":"floor"})
     result = await manager.async_configure(fid, {"next_step_id":"floor_custom"})
-    result = await manager.async_configure(fid, {"name":"Unsaved floor"})
-    assert result["description_placeholders"]["pending"] == "1"
+    result = await manager.async_configure(fid, {"name":"Autosaved floor"})
+    assert result["description_placeholders"]["pending"] == "0"
+    assert any(f["name"] == "Autosaved floor" for f in entry.options["topology"]["floors"])
     result = await manager.async_configure(fid, {"next_step_id":"overview_menu"})
     result = await manager.async_configure(fid, {"next_step_id":"manage_menu"})
     result = await manager.async_configure(fid, {"next_step_id":"beta_reset"})

@@ -36,8 +36,8 @@ async def test_native_options_edit_and_save(hass: HomeAssistant, enable_custom_i
     assert result["step_id"] == "edit_item"
     result = await manager.async_configure(flow_id, {"name": "Renamed room", "heating_target_c": 23})
     assert result["type"] is FlowResultType.MENU, result
-    # The existing options must not be changed before explicit save.
-    assert entry.options["topology"]["rooms"][0]["name"] == "Original"
+    # Confirming an edit applies it before closing the menu.
+    assert entry.options["topology"]["rooms"][0]["name"] == "Renamed room"
     result = await manager.async_configure(flow_id, {"next_step_id": "save"})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()

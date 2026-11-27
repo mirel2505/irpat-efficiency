@@ -37,7 +37,7 @@ async def test_native_registry_import(hass, enable_custom_integrations):
     result = await manager.async_configure(flow_id, {"confirmed": True})
     assert result["type"] is FlowResultType.MENU, result
     assert "discover_sensors" in result["menu_options"]
-    assert "ha_area_id" not in entry.options["topology"]["rooms"][0]
+    assert entry.options["topology"]["rooms"][0]["ha_area_id"] == area.id
     result = await manager.async_configure(flow_id, {"next_step_id": "save"})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()
@@ -76,8 +76,8 @@ async def test_native_room_selection_and_sensor_confirmation(hass, enable_custom
     assert result["step_id"] == "confirm_sensors", result
     result = await manager.async_configure(fid, {"temperatures": [sensor.entity_id]})
     assert result["type"] is FlowResultType.MENU, result
-    result = await manager.async_configure(fid, {"next_step_id": "save"})
-    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options["topology"]["bindings"][0]["entity_id"] == sensor.entity_id
+    manager.async_abort(fid)
     await hass.async_block_till_done()
     t = entry.options["topology"]
     assert len(t["rooms"]) == len(t["floors"]) == len(t["bindings"]) == 1
@@ -130,8 +130,8 @@ async def test_guided_room_and_batch_removal(hass, enable_custom_integrations):
     assert result["description_placeholders"]["sources"] == "HP"
     result = await manager.async_configure(fid, {"confirmed": True, "detach_zone_sources": True})
     assert result["step_id"] == "manage_menu", result
-    result = await manager.async_configure(fid, {"next_step_id": "save"})
-    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert len(entry.options["topology"]["zones"]) == 1
+    manager.async_abort(fid)
     await hass.async_block_till_done()
     stored = entry.options["topology"]
     assert len(stored["zones"]) == 1

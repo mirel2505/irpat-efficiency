@@ -130,7 +130,7 @@
     "step": {
       "init": {
         "title": "Configurația instalației",
-        "description": "Configurate: {floors} niveluri, {rooms} încăperi, {zones} zone hidraulice, {manifolds} distribuitoare, {circuits} circuite, {sources} surse.\nÎncăperi fără senzori de temperatură: {missing_sensors}. Încăperi fără circuite asociate: {missing_circuits} (unele pot fi neîncălzite).\nCiornă neaplicată: {pending} (1 = da, 0 = nu). Pașii finalizați se salvează local. Apasă Salvează configurația pentru aplicare.",
+        "description": "Configurate: {floors} niveluri, {rooms} încăperi, {zones} zone hidraulice, {manifolds} distribuitoare, {circuits} circuite, {sources} surse.\nÎncăperi fără senzori de temperatură: {missing_sensors}. Încăperi fără circuite asociate: {missing_circuits} (unele pot fi neîncălzite).\nPașii confirmați se salvează și se aplică automat. Poți închide oricând meniul.",
         "menu_options": {
           "floor": "Adaugă sau alege nivel",
           "zone": "Adaugă zonă hidraulică (regim comun de temperatură a apei)",
@@ -139,7 +139,7 @@
           "manifold": "Adaugă distribuitor",
           "circuit": "Adaugă circuit",
           "binding": "Adaugă senzor ambiental",
-          "save": "Salvează configurația",
+          "save": "Finalizează",
           "outdoor": "Configurează senzor exterior",
           "telemetry_rooms": "Senzori încăperi",
           "telemetry_sources": "Senzori surse termice",
@@ -443,30 +443,30 @@
       },
       "building_menu": {
         "title": "1. Clădire și temperatură exterioară",
-        "description": "Configurate: {floors} niveluri, {rooms} încăperi, {zones} zone hidraulice, {manifolds} distribuitoare, {circuits} circuite, {sources} surse.\nÎncăperi fără senzori de temperatură: {missing_sensors}. Încăperi fără circuite asociate: {missing_circuits} (unele pot fi neîncălzite).\nCiornă neaplicată: {pending} (1 = da, 0 = nu). Pașii finalizați se salvează local. Apasă Salvează configurația pentru aplicare.",
+        "description": "Configurate: {floors} niveluri, {rooms} încăperi, {zones} zone hidraulice, {manifolds} distribuitoare, {circuits} circuite, {sources} surse.\nÎncăperi fără senzori de temperatură: {missing_sensors}. Încăperi fără circuite asociate: {missing_circuits} (unele pot fi neîncălzite).\nPașii confirmați se salvează și se aplică automat. Poți închide oricând meniul.",
         "menu_options": {
           "floor": "Adaugă sau alege nivel",
           "import_structure": "Importă nivelurile și încăperile Home Assistant",
           "outdoor": "Configurează senzor exterior",
           "overview_menu": "Înapoi la configurare",
-          "save": "Salvează configurația"
+          "save": "Finalizează"
         }
       },
       "hydraulics_menu": {
         "title": "2. Circuite și distribuitoare",
-        "description": "Configurate: {floors} niveluri, {rooms} încăperi, {zones} zone hidraulice, {manifolds} distribuitoare, {circuits} circuite, {sources} surse.\nÎncăperi fără senzori de temperatură: {missing_sensors}. Încăperi fără circuite asociate: {missing_circuits} (unele pot fi neîncălzite).\nCiornă neaplicată: {pending} (1 = da, 0 = nu). Pașii finalizați se salvează local. Apasă Salvează configurația pentru aplicare.",
+        "description": "Configurate: {floors} niveluri, {rooms} încăperi, {zones} zone hidraulice, {manifolds} distribuitoare, {circuits} circuite, {sources} surse.\nÎncăperi fără senzori de temperatură: {missing_sensors}. Încăperi fără circuite asociate: {missing_circuits} (unele pot fi neîncălzite).\nPașii confirmați se salvează și se aplică automat. Poți închide oricând meniul.",
         "menu_options": {
           "zone": "Adaugă zonă hidraulică (regim comun de temperatură a apei)",
           "manifold": "Adaugă distribuitor",
           "circuit": "Adaugă circuit",
           "telemetry_manifolds": "Senzori distribuitor",
           "overview_menu": "Înapoi la configurare",
-          "save": "Salvează configurația"
+          "save": "Finalizează"
         }
       },
       "rooms_menu": {
         "title": "3. Încăperi și senzori",
-        "description": "Configurate: {floors} niveluri, {rooms} încăperi, {zones} zone hidraulice, {manifolds} distribuitoare, {circuits} circuite, {sources} surse.\nÎncăperi fără senzori de temperatură: {missing_sensors}. Încăperi fără circuite asociate: {missing_circuits} (unele pot fi neîncălzite).\nCiornă neaplicată: {pending} (1 = da, 0 = nu). Pașii finalizați se salvează local. Apasă Salvează configurația pentru aplicare.",
+        "description": "Configurate: {floors} niveluri, {rooms} încăperi, {zones} zone hidraulice, {manifolds} distribuitoare, {circuits} circuite, {sources} surse.\nÎncăperi fără senzori de temperatură: {missing_sensors}. Încăperi fără circuite asociate: {missing_circuits} (unele pot fi neîncălzite).\nPașii confirmați se salvează și se aplică automat. Poți închide oricând meniul.",
         "menu_options": {
           "room": "Adaugă sau alege încăpere",
           "room_setup": "Completează încăpere existentă (senzori și circuite)",
@@ -474,12 +474,12 @@
           "binding": "Adaugă senzor ambiental",
           "telemetry_rooms": "Senzori încăperi",
           "overview_menu": "Înapoi la configurare",
-          "save": "Salvează configurația"
+          "save": "Finalizează"
         }
       },
       "sources_menu": {
         "title": "4. Surse termice și costuri",
-        "description": "Configurate: {floors} niveluri, {rooms} încăperi, {zones} zone hidraulice, {manifolds} distribuitoare, {circuits} circuite, {sources} surse.\nÎncăperi fără senzori de temperatură: {missing_sensors}. Încăperi fără circuite asociate: {missing_circuits} (unele pot fi neîncălzite).\nCiornă neaplicată: {pending} (1 = da, 0 = nu). Pașii finalizați se salvează local. Apasă Salvează configurația pentru aplicare.",
+        "description": "Configurate: {floors} niveluri, {rooms} încăperi, {zones} zone hidraulice, {manifolds} distribuitoare, {circuits} circuite, {sources} surse.\nÎncăperi fără senzori de temperatură: {missing_sensors}. Încăperi fără circuite asociate: {missing_circuits} (unele pot fi neîncălzite).\nPașii confirmați se salvează și se aplică automat. Poți închide oricând meniul.",
         "menu_options": {
           "source": "Adaugă sursă termică",
           "source_settings": "Proprietăți și tarif sursă",
@@ -488,24 +488,24 @@
           "economic_source": "Combustibil și scenarii economice",
           "hybrid_zone": "Strategie sistem hibrid",
           "overview_menu": "Înapoi la configurare",
-          "save": "Salvează configurația"
+          "save": "Finalizează"
         }
       },
       "manage_menu": {
         "title": "5. Editează sau șterge",
-        "description": "Configurate: {floors} niveluri, {rooms} încăperi, {zones} zone hidraulice, {manifolds} distribuitoare, {circuits} circuite, {sources} surse.\nÎncăperi fără senzori de temperatură: {missing_sensors}. Încăperi fără circuite asociate: {missing_circuits} (unele pot fi neîncălzite).\nCiornă neaplicată: {pending} (1 = da, 0 = nu). Pașii finalizați se salvează local. Apasă Salvează configurația pentru aplicare.",
+        "description": "Configurate: {floors} niveluri, {rooms} încăperi, {zones} zone hidraulice, {manifolds} distribuitoare, {circuits} circuite, {sources} surse.\nÎncăperi fără senzori de temperatură: {missing_sensors}. Încăperi fără circuite asociate: {missing_circuits} (unele pot fi neîncălzite).\nPașii confirmați se salvează și se aplică automat. Poți închide oricând meniul.",
         "menu_options": {
           "edit": "Editează configurația existentă",
           "remove": "Șterge unul sau mai multe elemente",
           "discard_draft": "Renunță la ciornă (păstrează configurația salvată)",
           "overview_menu": "Înapoi la configurare",
-          "save": "Salvează configurația",
+          "save": "Finalizează",
           "beta_reset": "Resetează întreaga configurație (Beta)"
         }
       },
       "all_actions": {
         "title": "Expert – toate opțiunile",
-        "description": "Configurate: {floors} niveluri, {rooms} încăperi, {zones} zone hidraulice, {manifolds} distribuitoare, {circuits} circuite, {sources} surse.\nÎncăperi fără senzori de temperatură: {missing_sensors}. Încăperi fără circuite asociate: {missing_circuits} (unele pot fi neîncălzite).\nCiornă neaplicată: {pending} (1 = da, 0 = nu). Pașii finalizați se salvează local. Apasă Salvează configurația pentru aplicare.",
+        "description": "Configurate: {floors} niveluri, {rooms} încăperi, {zones} zone hidraulice, {manifolds} distribuitoare, {circuits} circuite, {sources} surse.\nÎncăperi fără senzori de temperatură: {missing_sensors}. Încăperi fără circuite asociate: {missing_circuits} (unele pot fi neîncălzite).\nPașii confirmați se salvează și se aplică automat. Poți închide oricând meniul.",
         "menu_options": {
           "floor": "Adaugă sau alege nivel",
           "zone": "Adaugă zonă hidraulică (regim comun de temperatură a apei)",
@@ -514,7 +514,7 @@
           "manifold": "Adaugă distribuitor",
           "circuit": "Adaugă circuit",
           "binding": "Adaugă senzor ambiental",
-          "save": "Salvează configurația",
+          "save": "Finalizează",
           "outdoor": "Configurează senzor exterior",
           "telemetry_rooms": "Senzori încăperi",
           "telemetry_sources": "Senzori surse termice",
@@ -605,7 +605,8 @@
     "abort": {
       "draft_conflict": "Configurația sau ciorna s-a schimbat în altă sesiune. Redeschide Configure pentru ultima ciornă.",
       "draft_read_failed": "Ciorna nu a putut fi citită. Verifică jurnalele Home Assistant.",
-      "draft_write_failed": "Ultimul pas nu a putut fi salvat în ciornă. Pașii salvați anterior rămân; verifică jurnalele."
+      "draft_write_failed": "Ultimul pas nu a putut fi salvat în ciornă. Pașii salvați anterior rămân; verifică jurnalele.",
+      "autosave_reload_failed": "Configurația a fost salvată, dar integrarea nu a putut fi reîncărcată. Verifică jurnalele și reîncarcă irPaT."
     }
   }
 }

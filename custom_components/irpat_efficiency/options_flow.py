@@ -35,7 +35,7 @@ def _choices(values, translation_key):
 
 
 class IrpatOptionsFlow(config_entries.OptionsFlow):
-    """Add named topology items using native selectors; save explicitly."""
+    """Apply each confirmed topology change and keep the options menu open."""
 
     async def async_step_init(self, user_input=None):
         """Open the configuration menu."""
@@ -155,7 +155,7 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
         return await self.async_step_init()
 
     async def _checkpoint(self):
-        """Persist completed steps before showing the next page; no live options writes."""
+        """Checkpoint and apply validated steps before returning to the menu."""
         async with self._draft_lock:
             current = self.config_entry.options.get("topology", empty_topology())
             if current != self._base or generation(self.config_entry) != self._base_generation:
@@ -170,6 +170,24 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
                 if desired != latest and (self._topology != self._base or isinstance(latest, dict) and latest.get("base") == self._base):
                     await self._draft_store.async_save(desired)
                     self._last_draft = desired
+                if self._topology != self._base:
+                    # The checkpoint is recoverable even if applying options fails.
+                    # Commit only validated form submissions, never partial input.
+                    self.hass.config_entries.async_update_entry(
+                        self.config_entry,
+                        options={**self.config_entry.options, "topology": deepcopy(self._topology)},
+                    )
+                    self._base = deepcopy(self._topology)
+                    # Runtime monitors capture configuration at startup. Reload
+                    # this integration only, not Home Assistant or equipment.
+                    if self.config_entry.state is config_entries.ConfigEntryState.LOADED:
+                        try:
+                            if not await self.hass.config_entries.async_reload(self.config_entry.entry_id):
+                                raise RuntimeError("irPaT reload failed")
+                        except Exception:
+                            _LOGGER.exception("Configuration saved but irPaT reload failed")
+                            self._draft_error = "autosave_reload_failed"
+                            return False
                 return True
             except Exception:
                 _LOGGER.exception("Could not checkpoint configuration draft")
@@ -803,8 +821,8 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
     async def async_step_save(self, user_input=None):
         if not await self._checkpoint():
             return self.async_abort(reason=self._draft_error)
-        # Keep the durable draft until Core commits the options; on the next
-        # session a draft whose base differs from saved options is ignored.
+        # All completed steps have already been applied. This closes the
+        # native options flow without requiring an additional save.
         return self.async_create_entry(title="", data={
             **self.config_entry.options, "topology": self._topology,
         })
