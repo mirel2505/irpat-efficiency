@@ -13,6 +13,7 @@ from .topology import empty_topology
 from .temperature_reader import read_rooms
 from .telemetry_reader import read_telemetry
 from .live_diagnostics import live_diagnostics
+from .fuel_economics import economic_overview
 from .operation_mode import classify_mode
 from .report_inputs import prepare_capture
 from .profile_review import review_profile
@@ -65,6 +66,9 @@ def ws_overview(hass, connection, msg):
                          "building_reports": reports.overview() if reports else {},
                          "energy_history": energy.overview(topology, telemetry) if energy else {},
                          "energy_save_failed": energy.save_failed if energy else False,
+                         "fuel_history": energy.fuel.overview(topology, dt_util.utcnow().timestamp(), dt_util.get_time_zone(hass.config.time_zone)) if energy and dt_util.get_time_zone(hass.config.time_zone) else {},
+                         "fuel_save_failed": energy.fuel_save_failed if energy else False,
+                         "economics": economic_overview(topology),
                          "live_diagnostics": live_diagnostics(topology, telemetry, rooms, dt_util.utcnow().timestamp()),
                          "history": history.overview(topology) if history else {},
                          "history_save_failed": history.save_failed if history else False,
