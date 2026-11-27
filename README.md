@@ -45,6 +45,12 @@ The pure Python efficiency module integrates matched five-minute electrical and 
 
 On 2026-11-27, all 11 efficiency unit tests passed in local Python. The tested Git blob hashes match the committed files: efficiency.py `9e3561f0de5d55c6b01294595f334e7d3c52d23e` and test_efficiency.py `ba71cf44932853b5a9f0796dc87301c63abda679`. This was a targeted module test, not a full regression run.
 
+## Cooling and condensation diagnostics — experimental
+
+The pure Python condensation module estimates dew point from synchronized indoor air temperature and relative humidity. It separately compares the measured surface temperature and a supply-water temperature proxy. Provisional defaults: 2°C review margin, maximum report age 900 seconds and maximum timestamp skew 300 seconds. Missing, stale, invalid or unsynchronized readings remain unknown; a zone with incomplete measured surface coverage cannot be declared low risk. Even observed surface temperatures above the margin are not a declaration of safe cooling. Independent hardware condensation protection is required. Actual humidity/surface/supply sensor bindings, runtime assessment, configurable thresholds and panel display remain pending. No equipment commands are issued.
+
+On 2026-11-27, the available local subset of 33 unit tests passed, including 11 new condensation tests. Git blob hashes of the two new tested files match the committed files: condensation.py `9bfc541febc2af80295784544493630050db0824` and test_condensation.py `698c721a28f8cdfce6d832e40e22805574313405`. This was not a complete repository regression run or a Home Assistant runtime test.
+
 ## Principii / Principles
 
 - Local, read-only towards physical equipment; manual adjustments by the user.
