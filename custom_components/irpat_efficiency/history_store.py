@@ -10,6 +10,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
+from .storage_identity import storage_key
 from .history import compare_room
 from .history_persistence import current_series, save_sample
 from .temperature_reader import MAX_REPORT_AGE_SECONDS, read_rooms, read_binding
@@ -27,7 +28,7 @@ class RoomHistory:
     def __init__(self, hass, entry):
         self.hass = hass
         self.entry = entry
-        self.store = Store(hass, 1, f"{DOMAIN}.history.{entry.entry_id}")
+        self.store = Store(hass, 1, storage_key(entry, "history"))
         self.data = {}
         self._cancel = None
         self._lock = asyncio.Lock()
