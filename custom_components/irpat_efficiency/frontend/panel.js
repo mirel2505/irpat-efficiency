@@ -289,6 +289,52 @@ class IrpatEfficiencyPanel extends HTMLElement {
     return box;
   }
 
+  liveDiagnostics(entry) {
+    const box=this.node("section",undefined,"card");
+    box.append(this.node("h2",this.t("Monitorizare instantanee","Live diagnostics")));
+    const live=entry.live_diagnostics||{};
+    const fmt=(v,unit)=>v==null?"—":v.toFixed(2)+" "+unit;
+    const labels={
+      boundary_unconfirmed:this.t("Limitele măsurătorilor neconfirmate","Measurement boundary unconfirmed"),
+      insufficient_data:this.t("Date insuficiente","Insufficient data"),
+      not_heat_pump:this.t("Nu este pompă de căldură","Not a heat pump"),
+      observed_signed_ratio:this.t("Raport instantaneu semnat, nu COP pe interval","Instantaneous signed ratio, not period COP"),
+      review_risk:this.t("Verifică riscul de condens","Review condensation risk"),
+      surface_above_margin:this.t("Suprafață măsurată peste marjă; nu garantează siguranța","Measured surface above margin; safety not guaranteed"),
+      proxy_only:this.t("Numai indicator din temperatura apei","Water temperature proxy only"),
+      unknown:this.t("Date insuficiente","Insufficient data")
+    };
+    for(const source of entry.topology.sources||[]){
+      const s=live.sources?.[source.id];
+      if(!s)continue;
+      box.append(this.node("h3",source.name));
+      const grid=this.node("div",undefined,"grid");
+      grid.append(this.card("ΔT",fmt(s.delta_t_c,"°C")),
+        this.card(this.t("Putere termică măsurată","Measured thermal power"),fmt(s.thermal_measured_w,"W")),
+        this.card(this.t("Putere termică calculată","Calculated thermal power"),fmt(s.thermal_calculated_w,"W")),
+        this.card(this.t("Putere electrică","Electrical power"),fmt(s.electrical_w,"W")),
+        this.card(this.t("Raport instantaneu semnat","Signed instantaneous ratio"),fmt(s.signed_power_ratio,"")));
+      box.append(grid,this.node("small",labels[s.cop_status]||s.cop_status,"muted"));
+    }
+    if(this.displayMode==="cooling"){
+      box.append(this.node("h3",this.t("Monitorizare condens","Condensation monitoring")));
+      for(const room of entry.topology.rooms||[]){
+        const c=live.condensation?.[room.id];
+        if(!c)continue;
+        const line=this.node("div",undefined,"room");
+        const details=this.node("div");
+        details.append(this.node("strong",room.name),
+          this.node("div",this.t("Punct de rouă: ","Dew point: ")+fmt(c.dew_point_c,"°C")),
+          this.node("div",this.t("Marjă suprafață: ","Surface margin: ")+fmt(c.surface?.margin_c,"°C")),
+          this.node("div",this.t("Marjă apă (indicator): ","Water margin (proxy): ")+fmt(c.supply_proxy?.margin_c,"°C")));
+        line.append(details,this.node("span",labels[c.status]||c.status));
+        box.append(line);
+      }
+      box.append(this.node("p",this.t("Evaluare orientativă. Protecția fizică independentă rămâne obligatorie.","Advisory assessment. Independent hardware protection is required."),"muted"));
+    }
+    return box;
+  }
+
   render() {
     const root = this.shadowRoot;
     root.replaceChildren();
@@ -353,7 +399,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       const grid = this.node("div",undefined,"grid");
       for (const [key,ro,en] of [["floors","Niveluri","Floors"],["rooms","Încăperi","Rooms"],["manifolds","Distribuitoare","Manifolds"],["circuits","Circuite","Circuits"],["zones","Zone","Zones"],["sources","Surse","Sources"]])
         grid.append(this.card(this.t(ro,en),(t[key]||[]).length));
-      main.append(grid,this.thermalDiagnostics(entry),this.referenceProfiles(entry),this.weatherObservations(entry));
+      main.append(grid,this.liveDiagnostics(entry),this.thermalDiagnostics(entry),this.referenceProfiles(entry),this.weatherObservations(entry));
       const rooms = new Map((t.rooms||[]).map(r=>[r.id,r]));
       for (const floor of t.floors||[]) {
         const section = this.node("section",undefined,"card");
