@@ -47,3 +47,14 @@ class ReportTests(unittest.TestCase):
 
     def test_duplicate_rooms(self):
         with self.assertRaises(ValueError): self.capture(room_ids=['a','a'])
+
+    def test_incompatible_comfort(self):
+        a = self.capture()
+        b = self.capture(86400)
+        b['indoor_mean_c'] = 21
+        with self.assertRaisesRegex(ValueError, 'incompatible_comfort'):
+            compare(a,b,intervention_at=86400,comparable=True)
+        self.assertFalse(compare(a,b,intervention_at=86400,comparable=True,
+                                 indoor_tolerance_c=1)['causal_savings_confirmed'])
+        with self.assertRaisesRegex(ValueError, 'incompatible_comfort'):
+            compare(a,b,intervention_at=86400,comparable=True,indoor_tolerance_c=float('nan'))
