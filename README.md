@@ -33,6 +33,12 @@ The pure Python heating-curve module evaluates reviewed comparable daily observa
 
 On 2026-11-27, nine climate-curve unit tests were executed locally and passed. The exact tested Git blobs are climate_curve.py `5c05fe88529c9f32dec5a0a3226ab1950fee53c6` and test_climate_curve.py `661d66972f19e140cb2049fcf0ef759d79c8e856`. Actual outdoor sensor configuration, synchronized collection, comparable-day review UI, journal integration, comfort target editing and HA runtime testing remain pending. No equipment commands are issued.
 
+## Natural cooling and inertia diagnostics — experimental
+
+The pure Python inertia module measures observed indoor temperature drift over reviewed natural cooling intervals, without switching equipment off. It requires confirmed absence of active heating input, reviewed comparable conditions, at least two hours, and complete synchronized five-minute indoor/outdoor samples including endpoints. It reports temperature drop, °C/hour, and, only with positive indoor/outdoor temperature differences and positive cooling, an observed drop divided by integrated degree-hours (1/hour). This is an observational indicator, not an insulation coefficient or measured thermal capacity; residual slab heat, solar gains, ventilation and other influences remain important. Automatic interval detection, source-state bindings, review UI and before/after comparisons are pending.
+
+Eight inertia unit tests were executed locally on 2026-11-27 and passed. Git blob hashes matched the tested files: inertia.py `58f3390918b219f40c9cfcaaddd0865fde012e18` and test_inertia.py `d7d6e09dfe19dc5cfda355517664310e22e659f6`. This is not a full regression run or a Home Assistant runtime test.
+
 ## Principii / Principles
 
 - Local, read-only towards physical equipment; manual adjustments by the user.
