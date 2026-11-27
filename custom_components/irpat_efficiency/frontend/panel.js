@@ -403,6 +403,102 @@ class IrpatEfficiencyPanel extends HTMLElement {
     return box;
   }
 
+  buildingReports(entry) {
+    const box=this.node("section",undefined,"card");
+    box.append(this.node("h2",this.t("Rapoarte comparative ale clădirii","Building comparison reports")));
+    const data=entry.building_reports||{};
+    const observations=data.observations||[];
+    const format=v=>Number.isFinite(v)?v.toFixed(2):"—";
+    const when=v=>new Date(v*1000).toLocaleString();
+    const input=(form,label,type,required=true)=>{
+      const l=this.node("label",label), i=this.node("input");
+      i.type=type;i.required=required;
+      if(type==="number"){i.min="0";i.step="any";}
+      if(type==="datetime-local")i.step="300";
+      if(type==="text")i.maxLength=120;
+      l.append(i);form.append(l);return i;
+    };
+    const check=(form,label)=>{
+      const l=this.node("label"),i=this.node("input");
+      i.type="checkbox";i.required=true;l.append(i,document.createTextNode(" "+label));form.append(l);return i;
+    };
+    const notes=form=>{
+      const l=this.node("label",this.t("Observații","Notes")),i=this.node("textarea");
+      i.maxLength=2000;l.append(i);form.append(l);return i;
+    };
+    const submit=(form,label,request)=>{
+      const button=this.node("button",label);button.type="submit";
+      const message=this.node("p","");message.setAttribute("role","status");form.append(button,message);
+      form.addEventListener("submit",async ev=>{
+        ev.preventDefault();
+        if(this.journalSaving||this.busy||!this._hass)return;
+        this.journalSaving=true;button.disabled=true;
+        try{await this._hass.callWS({entry_id:entry.entry_id,...request()});}
+        catch(error){
+          message.textContent=this.t("Salvarea nu a fost confirmată. Verifică datele și lista înainte de reîncercare.","Save not confirmed. Check input and list before retrying.")+" ("+String(error?.message||"")+")";
+          return;
+        }finally{this.journalSaving=false;button.disabled=false;}
+        await this.refresh();
+      });
+    };
+    const seconds=i=>new Date(i.value).getTime()/1000;
+    box.append(this.node("p",this.t("Perioade de 24 h–7 zile, cu date complete. Datele și orele sunt în fusul orar al browserului. Energia termică netă se introduce manual dintr-o măsurare verificată, inclusiv pierderile la degivrare; nu utiliza raportul Q/E parțial. Limita de măsurare trebuie să fie aceeași înainte și după.","Periods of 24 h–7 days with complete data. Dates and times use the browser time zone. Enter reviewed measured net heat manually, including defrost losses; do not use partial Q/E. Use the same measurement boundary before and after."),"muted"));
+    for(const o of observations.slice().reverse()){
+      const row=this.node("div",undefined,"journal-record");
+      row.append(this.node("strong",o.name),this.node("small",when(o.start)+" — "+when(o.end)),
+        this.node("small",this.t("Necesar aparent: ","Apparent heat input: ")+format(o.apparent_w_per_k)+" W/K · "+format(o.thermal_kwh)+" kWh"),
+        this.node("small",this.t("Limită măsurare: ","Measurement boundary: ")+o.boundary_id));
+      if(o.note)row.append(this.node("p",o.note));box.append(row);
+    }
+    const capture=this.node("details",undefined,"journal");
+    capture.append(this.node("summary",this.t("Salvează perioada analizată","Save observed period")));
+    const form=this.node("form");
+    const name=input(form,this.t("Denumire","Name"),"text");
+    const start=input(form,this.t("Început (multiplu de 5 minute)","Start (5-minute boundary)"),"datetime-local");
+    const end=input(form,this.t("Sfârșit (multiplu de 5 minute)","End (5-minute boundary)"),"datetime-local");
+    const boundary=input(form,this.t("Identificator limită de măsurare (același la ambele perioade)","Measurement boundary identifier (same for both periods)"),"text");
+    const thermal=input(form,this.t("Energie termică netă măsurată (kWh)","Measured net thermal energy (kWh)"),"number");thermal.min="0.000001";
+    const electric=input(form,this.t("Energie electrică (kWh, opțional)","Electricity (kWh, optional)"),"number",false);
+    const note=notes(form);
+    const reviewed=check(form,this.t("Confirm încălzirea, limita întregii clădiri, reprezentativitatea camerelor și energia netă pentru intervalul ales.","I confirm heating, whole-building boundary, representative rooms and net heat for this interval."));
+    submit(form,this.t("Salvează observația","Save observation"),()=>({
+      type:"irpat_efficiency/report_capture",name:name.value,start:seconds(start),end:seconds(end),
+      boundary_id:boundary.value,thermal_kwh:Number(thermal.value),
+      ...(electric.value!==""?{electric_kwh:Number(electric.value)}:{}),reviewed:reviewed.checked,note:note.value
+    }));
+    capture.append(form);box.append(capture);
+    if(observations.length>=2){
+      const detail=this.node("details",undefined,"journal");detail.append(this.node("summary",this.t("Compară înainte și după intervenție","Compare before and after intervention")));
+      const form=this.node("form");
+      const name=input(form,this.t("Denumire intervenție","Intervention name"),"text");
+      const select=label=>{
+        const l=this.node("label",label),s=this.node("select");s.required=true;
+        s.append(new Option(this.t("Alege perioada","Choose period"),""));
+        for(const o of observations)s.append(new Option(o.name+" · "+when(o.start),o.id));
+        l.append(s);form.append(l);return s;
+      };
+      const before=select(this.t("Înainte","Before")),after=select(this.t("După","After"));
+      const date=input(form,this.t("Moment intervenție","Intervention time"),"datetime-local");date.step="60";
+      const note=notes(form);
+      const comparable=check(form,this.t("Am verificat confortul, ventilația, aporturile, ocuparea și stocarea termică; perioadele sunt comparabile.","I reviewed comfort, ventilation, gains, occupancy and thermal storage; periods are comparable."));
+      submit(form,this.t("Salvează comparația","Save comparison"),()=>({
+        type:"irpat_efficiency/report_compare",name:name.value,before_id:before.value,after_id:after.value,
+        intervention_at:seconds(date),comparable:comparable.checked,note:note.value
+      }));
+      detail.append(form);box.append(detail);
+    }
+    for(const r of (data.reports||[]).slice().reverse()){
+      const row=this.node("div",undefined,"journal-record");
+      row.append(this.node("strong",r.name+" · "+when(r.intervention_at)),
+        this.node("small",r.before.name+" → "+r.after.name),
+        this.node("small",format(r.before.apparent_w_per_k)+" → "+format(r.after.apparent_w_per_k)+" W/K"),
+        this.node("strong",this.t("Variație normalizată observată: ","Observed normalized change: ")+format(r.normalized_change_pct)+"%"),
+        this.node("small",this.t("Nu dovedește o economie cauzată de intervenție.","Does not prove savings caused by the intervention.")));
+      if(r.note)row.append(this.node("p",r.note));box.append(row);
+    }
+    return box;
+  }
+
   render() {
     const root = this.shadowRoot;
     root.replaceChildren();
@@ -467,7 +563,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       const grid = this.node("div",undefined,"grid");
       for (const [key,ro,en] of [["floors","Niveluri","Floors"],["rooms","Încăperi","Rooms"],["manifolds","Distribuitoare","Manifolds"],["circuits","Circuite","Circuits"],["zones","Zone","Zones"],["sources","Surse","Sources"]])
         grid.append(this.card(this.t(ro,en),(t[key]||[]).length));
-      main.append(grid,this.liveDiagnostics(entry),this.energyHistory(entry),this.defrostHistory(entry),this.thermalDiagnostics(entry),this.referenceProfiles(entry),this.weatherObservations(entry));
+      main.append(grid,this.liveDiagnostics(entry),this.energyHistory(entry),this.defrostHistory(entry),this.thermalDiagnostics(entry),this.referenceProfiles(entry),this.weatherObservations(entry),this.buildingReports(entry));
       const rooms = new Map((t.rooms||[]).map(r=>[r.id,r]));
       for (const floor of t.floors||[]) {
         const section = this.node("section",undefined,"card");
