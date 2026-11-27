@@ -107,7 +107,8 @@
           "telemetry_manifolds": "Senzori distribuitoare",
           "source_settings": "Proprietăți și tarif sursă",
           "mode_source": "Regim real sursă",
-          "edit": "Editează configurația existentă"
+          "edit": "Editează configurația existentă",
+          "remove": "Elimină un element din configurație"
         }
       },
       "floor": {
@@ -269,6 +270,20 @@
           "length_m": "Lungimea circuitului",
           "entity_id": "Senzor sau termostat"
         }
+      },
+      "remove": {
+        "title": "Alege tipul elementului de eliminat",
+        "data": {
+          "collection": "Tipul elementului"
+        }
+      },
+      "remove_item": {
+        "title": "Confirmă eliminarea",
+        "description": "Se elimină doar elementul din configurație și asocierile sale de telemetrie. Elementele dependente trebuie eliminate separat. Istoricul nu este șters explicit; se aplică în continuare retenția normală. Modificările se aplică doar după salvarea configurației.",
+        "data": {
+          "item_id": "Element",
+          "confirmed": "Confirm eliminarea din configurație"
+        }
       }
     },
     "error": {
@@ -288,7 +303,9 @@
       "invalid_tariff": "Tarif sau cod monedă invalid.",
       "invalid_boundary": "Confirmare invalidă.",
       "invalid_mode_mapping": "Valorile trebuie să fie distincte, valide și să includă cel puțin o stare.",
-      "unsupported_edit": "Această schimbare structurală necesită un element nou."
+      "unsupported_edit": "Această schimbare structurală necesită un element nou.",
+      "object_in_use": "Alte elemente depind de acesta. Elimină mai întâi dependențele.",
+      "remove_confirmation_required": "Este necesară confirmarea explicită."
     }
   }
 }
