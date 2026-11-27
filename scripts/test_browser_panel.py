@@ -132,7 +132,7 @@ def run_case(browser, language, width, dark):
     panel.get_by_role("button", name=word("Adaugă etaj","Add floor"), exact=True).click()
     expect(panel.get_by_text("✓ "+word("Modificare salvată","Change saved"), exact=True)).to_be_visible()
     panel.get_by_role("button", name=word("Continuă →","Continue →"), exact=True).click()
-    expect(panel.locator(".setup").get_by_role("heading", name=word("🛏️ Camere","🛏️ Rooms"))).to_be_visible()
+    expect(panel.locator(".setup").get_by_role("heading", name=word("Camere","Rooms"), exact=True)).to_be_visible()
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 2"), "Setup horizontal overflow"
     panel.get_by_role("button", name=word("Înapoi la dashboard","Back to dashboard"), exact=True).click()
     expect(panel.get_by_role("heading", name="Test installation", exact=True)).to_be_visible()

@@ -58,3 +58,20 @@ async def test_graphical_configuration(hass, hass_ws_client, enable_custom_integ
     result = await client.receive_json()
     assert result["success"], result
     assert result["result"][0]["topology"] == t
+    t = await action("targets", mode="heating", room_ids=[room], value=22)
+    assert t["rooms"][0]["heating_target_c"] == 22
+    t = await action("add_floor", name="Temporary")
+    other = t["floors"][-1]["id"]
+    t = await action("move_room", id=room, floor_id=other)
+    assert t["rooms"][0]["floor_id"] == other
+    keep = t["floors"][0]["id"]
+    t = await action("merge_floor", id=other, target_id=keep, confirmed=True)
+    assert len(t["floors"]) == 1 and t["rooms"][0]["floor_id"] == keep
+    hass.states.async_set("weather.test", "sunny", {"temperature": 7, "temperature_unit": "°C"})
+    t = await action("outdoor", entity_id="weather.test")
+    assert t["outdoor_entity_id"] == "weather.test"
+    seq += 1
+    await client.send_json({"id":seq+1,"type":f"{DOMAIN}/overview"})
+    result = await client.receive_json()
+    assert result["success"], result
+    assert result["result"][0]["outdoor"]["reading"]["temperature_c"] == 7

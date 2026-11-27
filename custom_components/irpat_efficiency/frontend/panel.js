@@ -20,6 +20,8 @@ class IrpatEfficiencyPanel extends HTMLElement {
     this.setupStep = 0;
     this.setupMessage = '';
     this.setupError = '';
+    this.reviewedWindows = new Set();
+    this.balanceMessage = '';
   }
 
   set hass(value) {
@@ -40,7 +42,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
   }
 
   async refresh(quiet = false) {
-    if (!this._hass || this.busy || this.journalSaving || this.setup || this.setupBusy || (quiet && this.shadowRoot.querySelector('details.journal[open]'))) return;
+    if (!this._hass || this.busy || this.journalSaving || this.setup || this.setupBusy || (quiet && (this.shadowRoot.querySelector('details.journal[open], details.room-detail[open]') || this.shadowRoot.activeElement?.closest?.('.balance-form')))) return;
     this.busy = true;
     if (!quiet) this.render();
     try {
@@ -727,6 +729,87 @@ class IrpatEfficiencyPanel extends HTMLElement {
     return box;
   }
 
+  // Local vector icons, no network or emoji font dependency.
+  icon(name) {
+    const paths={home:"M3 10 12 3l9 7v10h-6v-7H9v7H3z",rooms:"M3 19V7m0 8h18m0 4V9h-9v6M3 11h5a3 3 0 0 1 3 3v1",sensor:"M10 14.5V5a2 2 0 0 1 4 0v9.5a4 4 0 1 1-4 0ZM12 8v8",loops:"M3 5h18M3 19h18M6 5v14M12 5v14M18 5v14",heat:"M12 3c1 5 6 6 6 12a6 6 0 0 1-12 0c0-3 2-5 3-6 0 4 3 4 3 4 2-3 0-7 0-10Z",check:"m5 12 4 4L19 6",weather:"M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10",target:"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18m0 5a4 4 0 1 0 0 8 4 4 0 0 0 0-8",settings:"M4 7h16M4 17h16M8 4v6m8 4v6",up:"M12 20V4m-6 6 6-6 6 6",down:"M12 4v16m-6-6 6 6 6-6",clock:"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18m0 4v5l3 2"};
+    const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
+    svg.setAttribute("viewBox","0 0 24 24");svg.setAttribute("width","24");svg.setAttribute("height","24");svg.setAttribute("fill","none");svg.setAttribute("stroke","currentColor");svg.setAttribute("stroke-width","1.7");svg.setAttribute("stroke-linecap","round");svg.setAttribute("stroke-linejoin","round");svg.setAttribute("aria-hidden","true");svg.classList.add("line-icon");
+    const p=document.createElementNS("http://www.w3.org/2000/svg","path");p.setAttribute("d",paths[name]||paths.settings);svg.append(p);return svg;
+  }
+
+  async quickTargets(entry, roomIds, value) {
+    if(this.busy||this.setupBusy||this.journalSaving)return;
+    this.setupBusy=true;this.balanceMessage='';
+    try {
+      const current=entry.revision || (await this._hass.callWS({type:"irpat_efficiency/configuration",entry_id:entry.entry_id})).revision;
+      await this._hass.callWS({type:"irpat_efficiency/configuration_action",entry_id:entry.entry_id,revision:current,action:"targets",payload:{mode:this.displayMode,room_ids:roomIds,value}});
+      this.balanceMessage=this.t("Țintă salvată. Colectarea pentru recomandări reîncepe.","Target saved. Advice data collection starts again.");
+    } catch(e) {this.balanceMessage=this.t("Nu s-a salvat. Actualizează și încearcă din nou.","Not saved. Refresh and try again.")+" "+String(e?.message||"");}
+    finally {this.setupBusy=false;await this.refresh();}
+  }
+
+  balanceHeader(entry) {
+    const t=entry.topology, mode=this.displayMode;
+    const box=this.node("section",undefined,"balance-hero card");
+    const readings=t.rooms.map(r=>entry.room_temperatures?.[r.id]?.[mode]);
+    const known=readings.filter(v=>v?.temperature_c!=null&&v.valid_count===v.configured_count);
+    const targets=known.filter(v=>v.target_c!=null);
+    const within=targets.filter(v=>Math.abs(v.deviation_c)<=.3+1e-9).length;
+    const heading=this.node("div",undefined,"hero-heading");heading.append(this.icon("home"),this.node("h2",this.t("Echilibrul casei","Home comfort")));box.append(heading);
+    const stats=this.node("div",undefined,"comfort-grid");
+    const metric=(icon,label,value,sub)=>{const e=this.node("div",undefined,"comfort-metric");e.append(this.icon(icon),this.node("small",label),this.node("strong",value),this.node("small",sub));return e;};
+    const mean=known.length?known.reduce((a,v)=>a+v.temperature_c,0)/known.length:null;
+    stats.append(metric("sensor",this.t("Temperatură medie","Average temperature"),mean==null?"—":mean.toFixed(1)+"°",known.length+"/"+t.rooms.length+" "+this.t("camere","rooms")),metric("target",this.t("În toleranță","On target"),within+"/"+targets.length,this.t("±0,3°C · citiri actuale","±0.3°C · current readings")));
+    const out=entry.outdoor?.reading, hist=entry.outdoor?.history?.windows?.["24"];
+    stats.append(metric("weather",this.t("Exterior","Outside"),out?.temperature_c==null?"—":out.temperature_c.toFixed(1)+"°",!out?this.t("Alege referința","Select a reference"):out.status==="reported"?out.name:this.t("Citire indisponibilă","Reading unavailable")));
+    box.append(stats);
+    if(out){box.append(this.node("small",this.t("Referință climatică: ","Weather reference: ")+out.entity_id+" · "+this.t("Media 24 h: ","24 h mean: ")+(hist?.mean_c==null?"—":hist.mean_c.toFixed(1)+" °C")+" · "+this.t("Acoperire: ","Coverage: ")+(hist?.coverage==null?"—":Math.round(hist.coverage*100)+"%"),"muted"));}
+    const control=this.node("details",undefined,"room-detail");control.append(this.node("summary",this.t("Setează ținta pentru toate camerele","Set a target for all rooms")));
+    if(t.rooms.length){
+      const f=this.setupForm(control,this.t("Aplică tuturor camerelor","Apply to all rooms"),()=>this.quickTargets(entry,t.rooms.map(r=>r.id),Number(target.value)));
+      f.form.classList.add("balance-form");
+      const vals=t.rooms.map(r=>r[mode+"_target_c"]);
+      const same=vals.every(v=>v!=null&&v===vals[0]);
+      const target=this.setupField(f.form,this.t("Temperatură dorită (°C)","Desired temperature (°C)"),"number",same?vals[0]:22);target.min=5;target.max=40;target.step=.1;target.required=true;
+      f.form.append(this.node("small",this.t("Schimbă doar țintele analizei, nu termostatele fizice.","Changes analysis targets only, not physical thermostats.")));f.finish();
+    }else control.append(this.node("p",this.t("Importă mai întâi camerele.","Import rooms first.")));
+    box.append(control);if(this.balanceMessage)box.append(this.node("p",this.balanceMessage));
+    return box;
+  }
+
+  balancePanel(entry) {
+    const box=this.node("section",undefined,"card advice-card");
+    const head=this.node("div",undefined,"hero-heading");head.append(this.icon("target"),this.node("h2",this.t("Următorul pas","Next step")));box.append(head);
+    if(this.displayMode!=="heating"){box.append(this.node("p",this.t("Recomandările direcționale sunt disponibile doar pentru încălzire. Răcirea necesită validări suplimentare.","Directional advice is available for heating only. Cooling requires additional validation.")));return box;}
+    const rows=Object.entries(entry.balance_advice||{});
+    if(!rows.length){box.append(this.node("p",this.t("Configurează distribuitorul, circuitele și sursa de încălzire pentru a începe analiza.","Configure the distributor, loops and heating source to start analysis.")));return box;}
+    const labels={collecting:this.t("Colectăm 48 h de date după configurare.","Collecting 48 h of data after setup."),configure_operation:this.t("Confirmă tipul de încălzire și reglarea manuală a circuitelor în configurator.","Confirm heating operation and manual loop control in setup."),configure_rooms:this.t("Asociază toate circuitele, senzorii și țintele zonei (minimum două camere).","Link all zone loops, sensors and targets (at least two rooms)."),configure_outdoor:this.t("Alege o referință de temperatură exterioară.","Choose an outdoor temperature reference."),settling:this.t("Așteptăm 48 h după ultimul reglaj înregistrat.","Waiting 48 h after the last logged adjustment."),insufficient_data:this.t("Date insuficiente. Sunt necesare cel puțin 90% citiri comune în fiecare zi.","Insufficient data. At least 90% common readings per day are required."),weather_not_comparable:this.t("Condiții exterioare diferite sau sarcină termică prea mică. Nu recomandăm reglaje.","Different outdoor conditions or low heating demand. No adjustments advised.")};
+    const names=new Map(entry.topology.rooms.map(r=>[r.id,r.name]));
+    for(const [id,a] of rows){
+      const zone=this.node("div",undefined,"advice-zone");zone.append(this.node("h3",a.name));
+      if(a.status!=="review_conditions"){zone.append(this.node("p",labels[a.status]||a.status));box.append(zone);continue;}
+      const key=entry.entry_id+":"+entry.revision+":"+id+":"+a.window_end+":"+JSON.stringify(a.rooms);
+      zone.append(this.node("p",this.t("Analiză: 48 h · exterior ","Analysis: 48 h · outdoor ")+a.outdoor_means_c.map(v=>v.toFixed(1)+"°C").join(" / ")+" · "+Math.round(a.coverage*100)+"%"));
+      if(a.common_direction)zone.append(this.node("p",this.t("Abatere generală: verifică mai întâi temperatura de tur sau curba climatică.","Common error: first review supply temperature or the weather curve."),"muted"));
+      if(!this.reviewedWindows.has(key)){
+        const review=this.node("label",this.t("Confirm că în aceste 48 h a funcționat încălzirea normal, fără reglaje neînregistrate, ferestre deschise prelungit sau aporturi neobișnuite de căldură.","I confirm normal heating during these 48 h, without unlogged adjustments, prolonged open windows or unusual heat gains."));
+        const cb=this.node("input");cb.type="checkbox";review.prepend(cb);zone.append(review);
+        const b=this.setupButton(zone,this.t("Verifică recomandările","Review suggestions"),()=>{if(cb.checked){this.reviewedWindows.add(key);this.render();}});b.disabled=true;cb.addEventListener("change",()=>{b.disabled=!cb.checked;});
+      }else{
+        const desc={decrease:this.t("Verifică o mică reducere a debitului","Review a small flow reduction"),increase:this.t("Verifică o mică creștere a debitului","Review a small flow increase"),hold:this.t("Menține reglajul","Keep adjustment"),observe:this.t("Continuă monitorizarea","Continue monitoring")};
+        for(const [rid,r] of Object.entries(a.rooms)){
+          const line=this.node("div",undefined,"advice-line");line.append(this.icon(r.direction==="increase"?"up":r.direction==="decrease"?"down":r.direction==="hold"?"check":"clock"));
+          const text=this.node("div");text.append(this.node("strong",names.get(rid)||rid),this.node("p",desc[r.direction]+" · "+(r.mean_error_c>0?"+":"")+r.mean_error_c.toFixed(2)+" °C"));
+          const locations=r.circuits.map(c=>(entry.topology.manifolds.find(m=>m.id===c.manifold_id)?.name||"")+" #"+c.position);
+          text.append(this.node("small",locations.join(" · "),"muted"));line.append(text);zone.append(line);
+        }
+        zone.append(this.node("small",this.t("Ipoteze, nu valori de debit calculate. Verifică limitele producătorului și debitul minim total; modifică gradual un singur reglaj, înregistrează înainte/după și așteaptă stabilizarea.","Hypotheses, not calculated flow values. Check manufacturer limits and minimum total flow; change one adjustment gradually, log before/after and wait for stabilization."),"muted"));
+      }
+      box.append(zone);
+    }
+    return box;
+  }
+
   async openSetup(entry) {
     if (this.setupBusy || this.busy || this.journalSaving) return;
     this.setupBusy = true;
@@ -824,7 +907,8 @@ class IrpatEfficiencyPanel extends HTMLElement {
     ];
     const nav=this.node("nav",undefined,"setup-nav");
     steps.forEach(([icon,label,done],i)=>{
-      const b=this.setupButton(nav,icon+" "+label+(done?" ✓":""),()=>{this.setupStep=i;this.setupError='';this.render();},true);
+      const b=this.setupButton(nav,label,()=>{this.setupStep=i;this.setupError='';this.render();},true);
+      b.replaceChildren(this.icon(["home","rooms","sensor","loops","heat","check"][i]),this.node("span",label),this.node("small",done?this.t("Configurat","Configured"):this.t("De verificat","Review")));
       b.setAttribute("aria-current",i===this.setupStep?"step":"false");
     });
     box.append(nav);
@@ -839,31 +923,42 @@ class IrpatEfficiencyPanel extends HTMLElement {
     const sensorOptions=(room, outdoor=false)=>{
       const area=t.rooms.find(r=>r.id===room)?.ha_area_id;
       const used=new Set([...t.bindings.map(b=>b.entity_id),...(t.telemetry||[]).map(b=>b.entity_id),t.outdoor_entity_id]);
-      return d.entities.filter(e=>!used.has(e.entity_id)&&(!outdoor||e.entity_id.startsWith("sensor.")))
+      return d.entities.filter(e=>!used.has(e.entity_id)&&(outdoor?/^(sensor|weather)\./.test(e.entity_id):/^(sensor|climate)\./.test(e.entity_id)))
         .sort((a,b)=>Number(!!area&&b.area_id===area)-Number(!!area&&a.area_id===area)||a.name.localeCompare(b.name))
         .map(e=>[e.entity_id,(area&&e.area_id===area?"★ ":"")+e.name+" · "+(e.temperature_c==null?"—":e.temperature_c.toFixed(1)+" °C")+" ("+e.entity_id+")"]);
     };
-    section.append(this.node("h2",steps[this.setupStep][0]+" "+steps[this.setupStep][1]));
+    const stepHeading=this.node("div",undefined,"hero-heading");stepHeading.append(this.icon(["home","rooms","sensor","loops","heat","check"][this.setupStep]),this.node("h2",steps[this.setupStep][1]));section.append(stepHeading);
     if(this.setupStep===0) {
       section.append(this.node("p",this.t("Importă etajele și camerele existente sau adaugă etaje manual. Senzorii unici sau desemnați în Home Assistant sunt asociați automat.","Import existing floors and rooms or add floors manually. Unique or designated Home Assistant sensors are linked automatically.")));
-      const areas=Object.values(d.native_areas),nativeFloors=Object.keys(d.native_floors);
-      if(areas.length||nativeFloors.length){
-        const f=this.setupForm(section,this.t("Importă din Home Assistant","Import from Home Assistant"),()=>this.setupAction("import",{
-          ...(fallback?.value?{fallback_floor:fallback.value}:{}),
-          ...(fallbackName?.value.trim()?{fallback_name:fallbackName.value.trim()}:{}),
-        }));
-        f.form.append(this.node("p",areas.length+" "+this.t("încăperi disponibile","available rooms")));
-        let fallback=null,fallbackName=null;
-        if(areas.some(a=>!nativeFloors.includes(a.floor_id))){
-          if(t.floors.length)fallback=this.setupField(f.form,this.t("Etaj pentru camere fără etaj în HA","Floor for rooms without an HA floor"),"select",t.floors[0].id,[["",this.t("Nu importa aceste camere","Skip these rooms")],...floorOptions]);
-          else fallbackName=this.setupField(f.form,this.t("Nume etaj pentru camere fără etaj","Floor name for rooms without a floor"),"text",this.t("Parter","Ground floor"));
-        }
-        f.finish();
+      const areas=Object.entries(d.native_areas),nativeFloors=Object.entries(d.native_floors);
+      if(areas.length){
+        const f=this.setupForm(section,this.t("Importă camerele selectate","Import selected rooms"),()=>{
+          const value=dest.value, selected=checks.filter(x=>x.checked).map(x=>x.value);
+          const payload={area_ids:selected};
+          if(value.startsWith("local:"))Object.assign(payload,{single_floor:true,fallback_floor:value.slice(6)});
+          else if(value.startsWith("native:"))Object.assign(payload,{single_floor:true,single_native_floor:value.slice(7)});
+          else if(value==="new")Object.assign(payload,{single_floor:true,fallback_name:newName.value});
+          this.setupAction("import",payload);
+        });
+        const destinations=[...t.floors.map(x=>["local:"+x.id,x.name]),...nativeFloors.filter(([id])=>!t.floors.some(f=>f.ha_floor_id===id)).map(([id,name])=>["native:"+id,name]),["new",this.t("Un etaj nou","One new floor")],["native",this.t("Păstrează etajele din HA (omite camerele fără etaj)","Keep HA floors (skip rooms without a floor)")]];
+        const dest=this.setupField(f.form,this.t("Pe ce etaj vrei să fie camerele?","Where should the rooms be placed?"),"select",destinations[0][0],destinations);
+        const newName=this.setupField(f.form,this.t("Nume etaj nou pentru import","New import floor name"),"text",this.t("Parter","Ground floor"));newName.parentElement.hidden=dest.value!=="new";dest.addEventListener("change",()=>{newName.parentElement.hidden=dest.value!=="new";});
+        const list=this.node("details",undefined,"import-list");list.open=true;list.append(this.node("summary",areas.length+" "+this.t("camere disponibile · selectează ce păstrezi","available rooms · choose what to keep")));
+        const checks=areas.map(([id,a])=>{const label=this.node("label",a.name+(d.native_floors[a.floor_id]?" · "+d.native_floors[a.floor_id]:""));const cb=this.node("input");cb.type="checkbox";cb.value=id;cb.checked=true;label.prepend(cb);list.append(label);return cb;});
+        f.form.append(list);f.finish();
       }
       for(const floor of t.floors){
         const row=this.node("div",undefined,"setup-item");row.append(this.node("strong","🏠 "+floor.name));
         const f=this.setupForm(row,this.t("Aplică numele","Apply name"),()=>this.setupAction("rename",{collection:"floors",id:floor.id,name:name.value}));
         const name=this.setupField(f.form,this.t("Nume etaj","Floor name"),"text",floor.name);name.required=true;f.finish();
+        row.append(this.node("small",t.rooms.filter(r=>r.floor_id===floor.id).length+" "+this.t("camere","rooms"),"muted"));
+        if(t.floors.length>1){
+          const merge=this.node("details",undefined,"remove-confirm");merge.append(this.node("summary",this.t("Combină cu alt etaj","Merge into another floor")));
+          const mf=this.setupForm(merge,this.t("Mută camerele și elimină acest etaj","Move rooms and remove this floor"),()=>this.setupAction("merge_floor",{id:floor.id,target_id:to.value,confirmed:true}));
+          const opts=floorOptions.filter(x=>x[0]!==floor.id);
+          const to=this.setupField(mf.form,this.t("Etajul pe care îl păstrezi","Floor to keep"),"select",opts[0][0],opts);
+          mf.form.append(this.node("small",this.t("Camerele și distribuitoarele sunt mutate; legăturile și istoricul arhivat rămân.","Rooms and distributors are moved; links and archived history are retained.")));mf.finish();row.append(merge);
+        }
         this.setupRemove(row,"floors",floor.id,floor.name);section.append(row);
       }
       const f=this.setupForm(section,this.t("Adaugă etaj","Add floor"),()=>this.setupAction("add_floor",{name:name.value}));
@@ -880,7 +975,9 @@ class IrpatEfficiencyPanel extends HTMLElement {
         const area=this.setupField(f.form,this.t("Suprafață (m²)","Area (m²)"),"number",room.area_m2);
         const heat=this.setupField(f.form,this.t("Temperatură dorită iarna (°C)","Desired winter temperature (°C)"),"number",room.heating_target_c);
         const cool=this.setupField(f.form,this.t("Temperatură dorită vara (°C)","Desired summer temperature (°C)"),"number",room.cooling_target_c);
-        f.finish();this.setupRemove(row,"rooms",room.id,room.name);section.append(row);
+        f.finish();
+        if(t.floors.length>1){const mf=this.setupForm(row,this.t("Mută camera","Move room"),()=>this.setupAction("move_room",{id:room.id,floor_id:floor.value}));const floor=this.setupField(mf.form,this.t("Etaj","Floor"),"select",room.floor_id,floorOptions);mf.finish();}
+        this.setupRemove(row,"rooms",room.id,room.name);section.append(row);
       }
       if(t.floors.length){
         const f=this.setupForm(section,this.t("Adaugă cameră","Add room"),()=>this.setupAction("add_room",{name:name.value,floor_id:floor.value}));
@@ -951,6 +1048,13 @@ class IrpatEfficiencyPanel extends HTMLElement {
         const name=this.setupField(f.form,this.t("Nume sursă","Source name"),"text",source.name);name.required=true;f.finish();
         this.setupRemove(row,"sources",source.id,source.name);section.append(row);
       }
+      for(const zone of t.zones){
+        const row=this.node("div",undefined,"setup-item");row.append(this.node("h3",zone.name));
+        const zf=this.setupForm(row,this.t("Confirmă modul de lucru","Confirm operating setup"),()=>this.setupAction("zone_settings",{id:zone.id,operating_mode:op.value,circuit_control:cc.value}));
+        const op=this.setupField(zf.form,this.t("Cum este reglată temperatura apei?","How is water temperature controlled?"),"select",zone.operating_mode,[["unknown",this.t("Nu știu","Not sure")],["weather",this.t("Automat după vreme","Weather compensation")],["fixed",this.t("Temperatură fixă","Fixed temperature")],["onoff",this.t("Pornit/oprit după termostat","Thermostat on/off")]]);
+        const cc=this.setupField(zf.form,this.t("Cum sunt reglate circuitele?","How are the loops controlled?"),"select",zone.circuit_control,[["unknown",this.t("Nu știu","Not sure")],["manual",this.t("Manual, de la debitmetre","Manual flow meters")],["open",this.t("Permanent deschise","Always open")],["automatic",this.t("Automat, cu actuatoare","Automatic actuators")]]);
+        zf.form.append(this.node("small",this.t("Recomandările sunt disponibile doar cu tur fix sau compensat meteo și circuite manuale/deschise.","Advice requires fixed or weather-compensated supply and manual/open loops.")));zf.finish();section.append(row);
+      }
       const f=this.setupForm(section,this.t("Adaugă sursă","Add source"),()=>this.setupAction("add_source",{name:name.value,source_type:kind.value,zone_ids:zones.filter(x=>x.checked).map(x=>x.value)}));
       const name=this.setupField(f.form,this.t("Nume sursă nouă","New source name"),"text");name.required=true;
       const kind=this.setupField(f.form,this.t("Tip echipament","Equipment type"),"select","heat_pump",types);
@@ -998,6 +1102,14 @@ class IrpatEfficiencyPanel extends HTMLElement {
       .journal{margin:12px 0}.journal form{display:grid;gap:10px;padding:10px 0}.journal label{display:grid;gap:4px;overflow-wrap:anywhere}.journal input,.journal select,.journal textarea{width:100%;box-sizing:border-box;min-width:0;padding:8px;border:1px solid var(--divider-color);border-radius:6px;background:var(--card-background-color);color:var(--primary-text-color);font:inherit}.journal label[hidden]{display:none}.flow-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px}.journal-record{border-top:1px solid var(--divider-color);padding:8px 0}.journal-record small{display:block}.journal-record p{white-space:pre-wrap;overflow-wrap:anywhere}
       .journal label:has(input[type="checkbox"]){display:flex;align-items:flex-start;gap:8px}.journal input[type="checkbox"]{width:18px;height:18px;flex:0 0 18px;accent-color:var(--primary-color)}.journal summary{cursor:pointer;padding:8px 0;overflow-wrap:anywhere}select:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}.mode{flex-wrap:wrap}.room>div{min-width:0}.loop small{display:block;overflow-wrap:anywhere}
       .setup{max-width:760px;margin:16px auto}.setup-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0}.setup-head h2{flex:1}.setup-nav{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:8px;margin:12px 0}.setup button{min-height:48px;white-space:normal;overflow-wrap:anywhere}.setup .secondary{background:var(--secondary-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color)}.setup-nav button[aria-current=step]{border:2px solid var(--primary-color);font-weight:bold}.setup-form{display:grid;gap:10px;margin:12px 0}.setup-form label{display:grid;gap:5px;font-size:1rem;overflow-wrap:anywhere}.setup-form input,.setup-form select{min-width:0;width:100%;box-sizing:border-box;min-height:46px;padding:8px;font:inherit;color:var(--primary-text-color);background:var(--card-background-color);border:1px solid var(--divider-color);border-radius:8px}.setup-form input[type=checkbox]{width:24px;min-height:24px}.setup-item{padding:14px 0;border-top:1px solid var(--divider-color);overflow-wrap:anywhere}.setup-item summary,.remove-confirm summary{cursor:pointer;padding:10px 0;min-height:24px}.remove-confirm{margin:8px 0}.setup-error:empty{display:none}.setup-diagram{max-width:100%}.setup .action{display:inline-block;margin-top:16px}
+      :host{--ir-accent:var(--primary-color,#4f70db);--ir-surface:color-mix(in srgb,var(--card-background-color,#fff) 88%,transparent);--ir-edge:color-mix(in srgb,var(--primary-text-color,#222) 10%,transparent)}
+      main{background:radial-gradient(ellipse at top right,color-mix(in srgb,var(--ir-accent) 10%,transparent),transparent 42%);min-height:100vh}
+      .card{background:var(--ir-surface);border:1px solid var(--ir-edge);border-radius:20px;box-shadow:0 4px 20px #00000008;backdrop-filter:blur(12px)}
+      button,a.action{border-radius:12px;font-weight:600;min-height:44px;transition:filter .15s}button:hover{filter:brightness(.95)}
+      .line-icon{flex:none;color:var(--ir-accent)}.hero-heading{display:flex;align-items:center;gap:10px}.hero-heading h2{margin:8px 0}
+      .comfort-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:10px;margin:14px 0}.comfort-metric{min-width:0;display:grid;gap:6px;border:1px solid var(--ir-edge);border-radius:16px;padding:12px;background:color-mix(in srgb,var(--ir-accent) 6%,transparent);overflow-wrap:anywhere}.comfort-metric strong{font-size:1.9rem;line-height:1.1;font-variant-numeric:tabular-nums}.comfort-metric small{color:var(--secondary-text-color)}
+      .room-tile{border:1px solid var(--ir-edge);border-radius:16px;padding:12px;margin:10px 0;background:color-mix(in srgb,var(--card-background-color) 80%,var(--ir-accent) 3%)}.room-tile .room{border:0;padding:0}.room-tile .temperature strong{font-size:1.6rem}.room-detail{margin:10px 0 0}.room-detail summary{cursor:pointer;color:var(--ir-accent);font-weight:600;padding:8px 0}.advice-zone{border-top:1px solid var(--ir-edge);padding:12px 0}.advice-zone label{display:flex;align-items:flex-start;gap:10px;margin:10px 0}.advice-zone input[type=checkbox]{flex:none;width:22px;height:22px;accent-color:var(--ir-accent)}.advice-line{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-top:1px solid var(--ir-edge)}.advice-line p{margin:5px 0}
+      .setup-nav button{display:grid;justify-items:center;gap:5px;padding:12px 6px;border-radius:16px;min-height:92px}.setup-nav small{font-size:.72rem;font-weight:400;color:var(--secondary-text-color)}.setup-nav button[aria-current=step]{background:color-mix(in srgb,var(--ir-accent) 12%,var(--card-background-color));box-shadow:0 3px 12px #0000000a}.setup-item{border:1px solid var(--ir-edge);border-radius:16px;padding:14px;margin:12px 0}.setup-form label[hidden]{display:none}.setup-form input,.setup-form select{border-radius:12px;border:1px solid var(--ir-edge);background:color-mix(in srgb,var(--card-background-color) 90%,var(--ir-accent) 5%)}.import-list label{display:flex;align-items:center;gap:10px;padding:7px 0}.import-list input[type=checkbox]{width:22px;height:22px;flex:none;accent-color:var(--ir-accent)}
       @media(max-width:600px){main{padding:12px}.room{flex-wrap:wrap}.temperature{text-align:left}.journal button,.mode button{min-height:44px}}
     `;
     root.append(style);
@@ -1057,12 +1169,14 @@ class IrpatEfficiencyPanel extends HTMLElement {
       const grid = this.node("div",undefined,"grid");
       for (const [key,ro,en] of [["floors","Niveluri","Floors"],["rooms","Încăperi","Rooms"],["manifolds","Distribuitoare","Manifolds"],["circuits","Circuite","Circuits"],["zones","Zone","Zones"],["sources","Surse","Sources"]])
         grid.append(this.card(this.t(ro,en),(t[key]||[]).length));
-      main.append(grid,this.liveDiagnostics(entry),this.energyHistory(entry),this.fuelEconomics(entry),this.thermalDiagnostics(entry));
+      main.append(this.balanceHeader(entry),this.balancePanel(entry));
+      if(this.viewMode==="expert")main.append(grid,this.liveDiagnostics(entry),this.energyHistory(entry),this.fuelEconomics(entry),this.thermalDiagnostics(entry));
       const rooms = new Map((t.rooms||[]).map(r=>[r.id,r]));
       for (const floor of t.floors||[]) {
         const section = this.node("section",undefined,"card");
         section.append(this.node("h2",floor.name));
         for (const room of (t.rooms||[]).filter(r=>r.floor_id===floor.id)) {
+          const roomCard=this.node("article",undefined,"room-tile");
           const row = this.node("div",undefined,"room");
           const sample = entry.room_temperatures?.[room.id];
           const value = sample?.[this.displayMode];
@@ -1088,7 +1202,12 @@ class IrpatEfficiencyPanel extends HTMLElement {
             this.node("small",target==null?this.t("Țintă nesetată","No target"):this.t("Țintă ","Target ")+target.toFixed(1)+" °C"),
             this.node("small",partial?this.t("Citiri parțiale","Partial readings"):labels[status]+(delta==null?"":" · "+(delta>0?"+":"")+delta.toFixed(1)+" °C"),"status-"+status));
           row.append(left,right);
-          section.append(row);
+          roomCard.append(row);
+          const detail=this.node("details",undefined,"room-detail");
+          detail.append(this.node("summary",this.t("Țintă și istoric","Target and history")));
+          const tf=this.setupForm(detail,this.t("Aplică ținta","Apply target"),()=>this.quickTargets(entry,[room.id],Number(targetInput.value)));
+          tf.form.classList.add("balance-form");
+          const targetInput=this.setupField(tf.form,this.t("Temperatură dorită (°C)","Desired temperature (°C)"),"number",target??22);targetInput.min=5;targetInput.max=40;targetInput.step=.1;targetInput.required=true;tf.finish();
           const hist=entry.history?.[room.id];
           const stats=hist?.windows?.[this.historyHours];
           if(hist){
@@ -1103,8 +1222,9 @@ class IrpatEfficiencyPanel extends HTMLElement {
               [this.t("Min. / Max.","Min. / Max."),format(stats?.min_c)+" / "+format(stats?.max_c)],
               [this.t("Acoperire","Coverage"),stats?.coverage==null?"—":Math.round(stats.coverage*100)+"% ("+stats.count+"/"+stats.expected+")"]];
             for(const [caption,val] of cells){const cell=this.node("div");cell.append(this.node("small",caption,"muted"),this.node("strong",val));historyBox.append(cell);}
-            section.append(historyBox);
+            detail.append(historyBox);
           }
+          roomCard.append(detail);section.append(roomCard);
         }
         for (const manifold of (t.manifolds||[]).filter(m=>m.floor_id===floor.id)) {
           section.append(this.node("h3",manifold.name));
