@@ -15,6 +15,7 @@ from .telemetry_reader import read_telemetry
 from .live_diagnostics import live_diagnostics
 from .operation_mode import classify_mode
 from .report_inputs import prepare_capture
+from .data_export import CSV_SECTIONS, capture as capture_export, serialize as serialize_export
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -226,6 +227,38 @@ async def ws_report_compare(hass, connection, msg):
     connection.send_result(msg["id"], result)
 
 
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/export_data",
+    vol.Required("entry_id"): str,
+    vol.Required("format"): vol.In(("json", "csv")),
+    vol.Optional("section"): vol.In(CSV_SECTIONS),
+})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_export_data(hass, connection, msg):
+    """Return a read-only export on explicit request, for administrators only."""
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    runtime = hass.data.get(DOMAIN, {})
+    if (entry is None or entry.domain != DOMAIN
+            or entry.entry_id not in runtime.get("active_entries", set())):
+        connection.send_error(msg["id"], "not_found", "No active installation")
+        return
+    try:
+        snapshot = capture_export(entry.entry_id, entry.title,
+                                  entry.options.get("topology", empty_topology()),
+                                  runtime, dt_util.utcnow().timestamp())
+        result = await hass.async_add_executor_job(
+            serialize_export, snapshot, msg["format"], msg.get("section"))
+    except ValueError as exc:
+        connection.send_error(msg["id"], "invalid_export", str(exc))
+        return
+    except Exception:
+        _LOGGER.exception("Could not prepare irPaT export")
+        connection.send_error(msg["id"], "export_failed", "Export preparation failed")
+        return
+    connection.send_result(msg["id"], result)
+
+
 async def async_register(hass):
     """Register the API and static asset once per HA runtime."""
     runtime = hass.data[DOMAIN]
@@ -240,6 +273,7 @@ async def async_register(hass):
         websocket_api.async_register_command(hass, ws_profile_create)
         websocket_api.async_register_command(hass, ws_report_capture)
         websocket_api.async_register_command(hass, ws_report_compare)
+        websocket_api.async_register_command(hass, ws_export_data)
         runtime["api_registered"] = True
     if not runtime.get("panel_registered"):
         await panel_custom.async_register_panel(
