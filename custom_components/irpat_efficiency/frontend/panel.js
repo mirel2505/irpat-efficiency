@@ -539,7 +539,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
         const modes={heating:this.t("Încălzire","Heating"),cooling:this.t("Răcire","Cooling"),dhw:this.t("ACM","Domestic hot water"),standby:this.t("Așteptare","Standby"),defrost:this.t("Degivrare","Defrost"),off:this.t("Oprit","Off")};
         box.append(this.node("p",this.t("Regim raportat: ","Reported mode: ")+(modes[reported.mode]||this.t("Necunoscut","Unknown")),"muted"));
       }
-      const grid=this.node("div",undefined,"grid");
+      const grid=this.node("div",undefined,"grid diagnostic-grid");
       grid.append(this.card("ΔT",fmt(s.delta_t_c,"°C")),
         this.card(this.t("Putere termică măsurată","Measured thermal power"),fmt(s.thermal_measured_w,"W")),
         this.card(this.t("Putere termică calculată","Calculated thermal power"),fmt(s.thermal_calculated_w,"W")),
@@ -1270,7 +1270,51 @@ class IrpatEfficiencyPanel extends HTMLElement {
       .comfort-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:10px;margin:14px 0}.comfort-metric{min-width:0;display:grid;gap:6px;border:1px solid var(--ir-edge);border-radius:16px;padding:12px;background:color-mix(in srgb,var(--ir-accent) 6%,transparent);overflow-wrap:anywhere}.comfort-metric strong{font-size:1.9rem;line-height:1.1;font-variant-numeric:tabular-nums}.comfort-metric small{color:var(--secondary-text-color)}
       .room-tile{border:1px solid var(--ir-edge);border-radius:16px;padding:12px;margin:10px 0;background:color-mix(in srgb,var(--card-background-color) 80%,var(--ir-accent) 3%)}.room-tile .room{border:0;padding:0}.room-tile .temperature strong{font-size:1.6rem}.room-detail{margin:10px 0 0}.room-detail summary{cursor:pointer;color:var(--ir-accent);font-weight:600;padding:8px 0}.advice-zone{border-top:1px solid var(--ir-edge);padding:12px 0}.advice-zone label{display:flex;align-items:flex-start;gap:10px;margin:10px 0}.advice-zone input[type=checkbox]{flex:none;width:22px;height:22px;accent-color:var(--ir-accent)}.advice-line{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-top:1px solid var(--ir-edge)}.advice-line p{margin:5px 0}
       .setup-nav button{display:grid;justify-items:center;gap:5px;padding:12px 6px;border-radius:16px;min-height:92px}.setup-nav small{font-size:.72rem;font-weight:400;color:var(--secondary-text-color)}.setup-nav button[aria-current=step]{background:color-mix(in srgb,var(--ir-accent) 12%,var(--card-background-color));box-shadow:0 3px 12px #0000000a}.setup-item{border:1px solid var(--ir-edge);border-radius:16px;padding:14px;margin:12px 0}.setup-form label[hidden]{display:none}.setup-form input,.setup-form select{border-radius:12px;border:1px solid var(--ir-edge);background:color-mix(in srgb,var(--card-background-color) 90%,var(--ir-accent) 5%)}.import-list label{display:flex;align-items:center;gap:10px;padding:7px 0}.import-list input[type=checkbox]{width:22px;height:22px;flex:none;accent-color:var(--ir-accent)}
-      @media(max-width:600px){main{padding:12px}.room{flex-wrap:wrap}.temperature{text-align:left}.journal button,.mode button{min-height:44px}}
+      /* Dense dashboard: metrics are read-only, controls retain touch targets. */
+      :host{font-size:14px;line-height:1.4}
+      main{padding:12px}
+      header{gap:8px}
+      h1{font-size:1.3rem}h2{font-size:1.05rem;margin:8px 0}h3{font-size:.95rem;margin:8px 0 5px}h4{margin:8px 0 4px}
+      p{margin:6px 0}
+      .grid{gap:6px;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));margin:6px 0}
+      .card{padding:10px;margin-bottom:8px;border-radius:12px;box-shadow:none;backdrop-filter:none;min-width:0}
+      .grid>.card{margin:0}
+      .metric{padding:7px 9px;overflow-wrap:anywhere}
+      .metric>.muted{font-size:.79rem;line-height:1.25}
+      .metric strong{font-size:1.2rem;line-height:1.2;margin-top:3px;font-variant-numeric:tabular-nums}
+      .topology-grid{grid-template-columns:repeat(6,minmax(0,1fr));gap:5px}
+      .topology-grid .metric{display:flex;align-items:center;justify-content:space-between;gap:4px}
+      .topology-grid .metric strong{margin:0;font-size:1.12rem}
+      .diagnostic-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:0;margin:4px 0}
+      .diagnostic-grid>.metric{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border:0;border-bottom:1px solid var(--ir-edge);border-radius:0;background:none}
+      .diagnostic-grid>.metric:last-child{border-bottom:0}
+      .diagnostic-grid .metric strong{margin:0;font-size:1rem;text-align:right;white-space:nowrap}
+      .diagnostic-grid .metric>.muted{font-size:.85rem}
+      .comfort-grid{gap:6px;margin:8px 0;grid-template-columns:repeat(auto-fit,minmax(100px,1fr))}
+      .comfort-metric{padding:7px;gap:3px;border-radius:10px}
+      .comfort-metric strong{font-size:1.35rem}
+      .room-tile{padding:8px;margin:5px 0;border-radius:10px}
+      .room-tile .temperature strong{font-size:1.25rem}
+      .room{gap:6px;padding:5px 0}
+      .room-detail{margin:4px 0 0}.room-detail summary{padding:5px 0}
+      .history{margin:5px 0 7px;padding:6px;gap:4px}
+      .mode{margin:8px 0;gap:5px}
+      .advice-zone,.advice-line{padding:7px 0;gap:6px}
+      .journal{margin:6px 0}.journal form{gap:7px;padding:6px 0}.journal-record{padding:6px 0}
+      .journal input:not([type=checkbox]),.journal select,.journal textarea{padding:6px;min-height:44px}
+      .flow-fields{gap:6px}
+      .setup{margin:8px auto}.setup-head{margin:6px 0;gap:6px}
+      .setup-nav{gap:5px;margin:6px 0;grid-template-columns:repeat(6,minmax(0,1fr))}
+      .setup-nav button{padding:6px 3px;min-height:64px;border-radius:10px;gap:2px;font-size:.78rem}
+      .setup-nav small{font-size:.66rem}
+      .setup-item{padding:8px;margin:6px 0;border-radius:10px}
+      .setup-form{gap:6px;margin:6px 0}.setup-form label{gap:3px;font-size:.9rem}
+      .setup-form input,.setup-form select{min-height:44px;padding:6px}
+      .setup-form input[type=checkbox]{min-height:24px}
+      .setup button{min-height:44px}.setup-item summary,.remove-confirm summary{padding:6px 0}
+      @media(max-width:720px){.topology-grid,.setup-nav{grid-template-columns:repeat(3,minmax(0,1fr))}}
+      @media(max-width:600px){main{padding:8px}.room{flex-wrap:nowrap}.temperature{text-align:right}.journal button,.mode button{min-height:44px}.flow-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+      @media(max-width:340px){.topology-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.room{flex-wrap:wrap}}
     `;
     root.append(style);
     const main = this.node("main");
@@ -1326,7 +1370,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       period.disabled=this.busy||this.journalSaving;
       period.addEventListener("change",()=>{if(this.busy||this.journalSaving){period.value=this.historyHours;return;}this.historyHours=period.value;this.render();});
       const periodLabel=this.node("label",this.t("Interval statistic: ","Statistics interval: "));periodLabel.append(period);main.append(periodLabel);
-      const grid = this.node("div",undefined,"grid");
+      const grid = this.node("div",undefined,"grid topology-grid");
       for (const [key,ro,en] of [["floors","Niveluri","Floors"],["rooms","Încăperi","Rooms"],["manifolds","Distribuitoare","Manifolds"],["circuits","Circuite","Circuits"],["zones","Zone","Zones"],["sources","Surse","Sources"]])
         grid.append(this.card(this.t(ro,en),(t[key]||[]).length));
       main.append(this.balanceHeader(entry),this.balancePanel(entry));
