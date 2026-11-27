@@ -297,6 +297,28 @@ class IrpatEfficiencyPanel extends HTMLElement {
     return box;
   }
 
+  // Reviews use saved data on the server and never write equipment settings.
+  reviewButton(entry, form, request, output, show) {
+    const button=this.node("button",this.t("Analizează","Analyze"));button.type="submit";
+    form.append(button,output);output.setAttribute("role","status");
+    form.addEventListener("submit",async ev=>{
+      ev.preventDefault();
+      if(!this._hass||this.busy||this.journalSaving)return;
+      this.journalSaving=true;button.disabled=true;output.replaceChildren();
+      try{
+        const result=await this._hass.callWS({entry_id:entry.entry_id,...request()});
+        if(output.isConnected)show(result);
+      }catch(error){
+        if(output.isConnected)output.textContent=this.t("Analiză indisponibilă. Verifică perioada, configurația și istoricul intervențiilor.","Analysis unavailable. Check the interval, configuration and adjustment history.")+" ("+String(error?.message||"")+")";
+      }finally{this.journalSaving=false;button.disabled=false;}
+    });
+  }
+
+  reviewCheckbox(form,label) {
+    const l=this.node("label"),i=this.node("input");i.type="checkbox";i.required=true;
+    l.append(i,document.createTextNode(" "+label));form.append(l);return i;
+  }
+
   weatherObservations(entry) {
     const box=this.node("section",undefined,"card");
     box.append(this.node("h2",this.t("Observații climatice","Weather observations")));
@@ -308,16 +330,81 @@ class IrpatEfficiencyPanel extends HTMLElement {
     for(const z of entry.topology.zones||[]){
       box.append(this.node("h3",z.name));
       const rows=observations[z.id]||[];
-      if(!rows.length)box.append(this.node("p",this.t("Se colectează date sau zona nu poate fi analizată separat.","Collecting data or zone cannot be analyzed separately."),"muted"));
-      for(const d of rows){
-        const line=this.node("div",undefined,"room");
-        const temp=v=>v==null?"—":v.toFixed(2)+" °C";
-        line.append(this.node("span",new Date(d.start*1000).toLocaleString()+" — "+new Date(d.end*1000).toLocaleString()),
-          this.node("span",this.t("Exterior ","Outdoor ")+temp(d.outdoor_c)+" · "+this.t("Abatere ","Error ")+temp(d.common_error_c)+" · "+Math.round(d.coverage*100)+"%"));
-        box.append(line);
+      if(!rows.length){
+        box.append(this.node("p",this.t("Se colectează date sau zona nu poate fi analizată separat.","Collecting data or zone cannot be analyzed separately."),"muted"));continue;
       }
+      const detail=this.node("details",undefined,"journal");
+      detail.append(this.node("summary",this.t("Selectează perioadele comparabile","Select comparable periods")));
+      const form=this.node("form"),choices=[];
+      for(const d of rows){
+        const label=this.node("label"),check=this.node("input");check.type="checkbox";
+        check.disabled=d.coverage<0.9||d.common_error_c==null||d.outdoor_c==null;
+        const temp=v=>v==null?"—":v.toFixed(2)+" °C";
+        label.append(check,document.createTextNode(" "+new Date(d.start*1000).toLocaleString()+" — "+new Date(d.end*1000).toLocaleString()+" · "+this.t("Exterior ","Outdoor ")+temp(d.outdoor_c)+" · "+this.t("Abatere ","Error ")+temp(d.common_error_c)+" · "+Math.round(d.coverage*100)+"%"));
+        choices.push({check,start:d.start});form.append(label);
+      }
+      const reviewed=this.reviewCheckbox(form,this.t("Confirm încălzirea continuă, condiții comparabile, aceeași curbă și lipsa intervențiilor neînregistrate în perioadele selectate.","I confirm continuous heating, comparable conditions, unchanged curve and no unrecorded interventions in the selected periods."));
+      const output=this.node("div");
+      this.reviewButton(entry,form,()=>({type:"irpat_efficiency/curve_review",zone_id:z.id,end:rows[0].end,
+        starts:choices.filter(x=>x.check.checked).map(x=>x.start),reviewed:reviewed.checked}),output,r=>{
+        const labels={review_slope:this.t("Verifică panta curbei","Review curve slope"),review_offset:this.t("Verifică deplasarea curbei","Review curve offset"),review_fixed_supply:this.t("Verifică temperatura de tur","Review supply temperature"),near_targets:this.t("Aproape de ținte","Near targets"),insufficient_data:this.t("Date insuficiente","Insufficient data"),monitor_only:this.t("Doar monitorizare","Monitoring only"),weather_changed:this.t("Condiții exterioare diferite","Outdoor conditions changed"),inconclusive:this.t("Rezultat neconcludent","Inconclusive"),duplicate_day:this.t("Perioadă duplicată","Duplicate period")};
+        const directions={raise:this.t("Sens de analizat: creștere","Direction to review: increase"),lower:this.t("Sens de analizat: reducere","Direction to review: decrease"),steeper:this.t("Sens de analizat: pantă mai mare","Direction to review: steeper slope"),flatter:this.t("Sens de analizat: pantă mai mică","Direction to review: flatter slope")};
+        output.append(this.node("p",labels[r.status]||r.status),this.node("small",this.t("Perioade utilizate: ","Periods used: ")+r.days));
+        if(r.direction)output.append(this.node("p",directions[r.direction]||r.direction));
+        output.append(this.node("small",this.t("Ipoteză bazată pe observații confirmate manual; nu este o setare calculată sau o comandă.","Hypothesis from manually reviewed observations; not a calculated setting or command."),"muted"));
+      });
+      detail.append(form);box.append(detail);
     }
-    box.append(this.node("small",this.t("Intervale sincronizate de 24 h pentru încălzire. Observațiile nu sunt încă validate ca fiind comparabile; nu se recomandă modificarea curbei.","Aligned 24 h heating windows. Observations are not yet reviewed for comparability; no curve adjustment is recommended."),"muted"));
+    box.append(this.node("small",this.t("Ferestre de 24 h. Sunt necesare minimum 3 perioade eligibile, respectiv 5 pentru pantă și o variație exterioară de minimum 5°C. Regimul real nu este certificat automat.","24-hour windows. At least 3 eligible periods, or 5 with at least 5°C outdoor span for slope review. Actual operation is not automatically certified."),"muted"));
+    return box;
+  }
+
+  inertiaReview(entry) {
+    const detail=this.node("details",undefined,"card journal");
+    detail.append(this.node("summary",this.t("Inerție termică – răcire naturală","Thermal inertia – natural cooling")));
+    if(!entry.topology.outdoor_entity_id||!(entry.topology.rooms||[]).length){
+      detail.append(this.node("p",this.t("Sunt necesare o cameră și temperatura exterioară.","A room and outdoor temperature are required.")));return detail;
+    }
+    const form=this.node("form"),room=this.node("select");room.required=true;
+    for(const r of entry.topology.rooms)room.append(new Option(r.name,r.id));
+    const label=this.node("label",this.t("Cameră","Room"));label.append(room);form.append(label);
+    const time=(title)=>{
+      const l=this.node("label",title),i=this.node("input");i.type="datetime-local";i.step="300";i.required=true;l.append(i);form.append(l);return i;
+    };
+    const start=time(this.t("Început (ora locală a browserului)","Start (browser local time)"));
+    const end=time(this.t("Sfârșit (ora locală a browserului)","End (browser local time)"));
+    const off=this.reviewCheckbox(form,this.t("Confirm că nu a existat aport activ de încălzire sau răcire în acest interval.","I confirm there was no active heating or cooling input during this interval."));
+    const comparable=this.reviewCheckbox(form,this.t("Am verificat ventilația, aporturile solare, ocuparea și căldura reziduală.","I reviewed ventilation, solar gains, occupancy and residual heat."));
+    const output=this.node("div");
+    this.reviewButton(entry,form,()=>({type:"irpat_efficiency/inertia_review",room_id:room.value,
+      start:new Date(start.value).getTime()/1000,end:new Date(end.value).getTime()/1000,
+      heat_off_confirmed:off.checked,comparable:comparable.checked}),output,r=>{
+      if(r.status!=="observed"){output.textContent=this.t("Date insuficiente sau interval neconfirmat.","Insufficient data or unreviewed interval.");return;}
+      const fmt=(v,u)=>Number.isFinite(v)?v.toFixed(3)+" "+u:"—";
+      output.append(this.node("p",this.t("Scădere observată: ","Observed drop: ")+fmt(r.drop_c,"°C")),
+        this.node("p",this.t("Rată de răcire: ","Cooling rate: ")+fmt(r.rate_c_per_h,"°C/h")),
+        this.node("p",this.t("Indicator normalizat: ","Normalized indicator: ")+fmt(r.normalized_per_h,"1/h")));
+    });
+    detail.append(this.node("p",this.t("Interval natural de 2 ore–7 zile, aliniat la 5 minute, cu toate măsurătorile. Nu opri instalația pentru test; analiza nu măsoară direct izolația sau capacitatea termică.","Natural interval of 2 hours–7 days, aligned to 5 minutes, with complete measurements. Do not switch equipment off for this test; the analysis does not directly measure insulation or heat capacity."),"muted"),form);
+    return detail;
+  }
+
+  modeHistory(entry) {
+    const box=this.node("section",undefined,"card"),history=entry.mode_history||{};
+    if(!Object.keys(history).length)return this.node("div");
+    box.append(this.node("h2",this.t("Istoric regimuri raportate","Reported mode history")));
+    const labels={heating:this.t("Încălzire","Heating"),cooling:this.t("Răcire","Cooling"),dhw:this.t("ACM","DHW"),standby:this.t("Așteptare","Standby"),defrost:this.t("Degivrare","Defrost"),off:this.t("Oprit","Off")};
+    const name=m=>labels[m]||this.t("Necunoscut","Unknown");
+    for(const s of entry.topology.sources||[]){
+      const h=history[s.id];if(!h)continue;
+      box.append(this.node("h3",s.name));
+      if(h.save_failed||h.pending_count>0)box.append(this.node("p",this.t("Salvare neconfirmată; evenimente restante: ","Save not confirmed; pending events: ")+(h.pending_count||0),"status-warm"));
+      for(const e of (h.recent||[]).slice().reverse()){
+        box.append(this.node("p",new Date(e.observed_at*1000).toLocaleString()+" · "+name(e.previous_mode)+" → "+name(e.mode)));
+      }
+      if(!(h.recent||[]).length)box.append(this.node("p",this.t("Nu există observații salvate.","No saved observations."),"muted"));
+    }
+    box.append(this.node("small",this.t("Ultimele 20 de observații salvate pe sursă, nu dovada unui regim continuu. Ora afișată este ora observării.","Last 20 saved observations per source, not proof of continuous operation. Time shown is observation time."),"muted"));
     return box;
   }
 
@@ -652,7 +739,7 @@ class IrpatEfficiencyPanel extends HTMLElement {
       const grid = this.node("div",undefined,"grid");
       for (const [key,ro,en] of [["floors","Niveluri","Floors"],["rooms","Încăperi","Rooms"],["manifolds","Distribuitoare","Manifolds"],["circuits","Circuite","Circuits"],["zones","Zone","Zones"],["sources","Surse","Sources"]])
         grid.append(this.card(this.t(ro,en),(t[key]||[]).length));
-      main.append(grid,this.liveDiagnostics(entry),this.energyHistory(entry),this.defrostHistory(entry),this.thermalDiagnostics(entry),this.referenceProfiles(entry),this.weatherObservations(entry),this.buildingReports(entry),this.exportData(entry));
+      main.append(grid,this.liveDiagnostics(entry),this.energyHistory(entry),this.defrostHistory(entry),this.thermalDiagnostics(entry),this.referenceProfiles(entry),this.weatherObservations(entry),this.inertiaReview(entry),this.modeHistory(entry),this.buildingReports(entry),this.exportData(entry));
       const rooms = new Map((t.rooms||[]).map(r=>[r.id,r]));
       for (const floor of t.floors||[]) {
         const section = this.node("section",undefined,"card");
