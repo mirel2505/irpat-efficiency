@@ -35,6 +35,106 @@
         "automatic": "Automatically controlled actuators",
         "unknown": "Unknown"
       }
+    },
+    "source_type": {
+      "options": {
+        "heat_pump": "Heat pump",
+        "gas": "Gas / LPG",
+        "electric": "Electric",
+        "biomass": "Wood / pellets",
+        "district": "District heating",
+        "hybrid": "Hybrid",
+        "other": "Other",
+        "unintegrated": "Not integrated"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "System configuration",
+        "description": "Add floors and zones, then rooms, manifolds, circuits and sensors. Select Save to persist changes.",
+        "menu_options": {
+          "floor": "Add floor",
+          "zone": "Add hydraulic zone",
+          "room": "Add room",
+          "source": "Add heat source",
+          "manifold": "Add manifold",
+          "circuit": "Add circuit",
+          "binding": "Add room sensor",
+          "save": "Save configuration"
+        }
+      },
+      "floor": {
+        "title": "Add floor",
+        "data": {
+          "name": "Custom name"
+        }
+      },
+      "zone": {
+        "title": "Add hydraulic zone",
+        "data": {
+          "name": "Custom name",
+          "operating_mode": "Operating mode",
+          "circuit_control": "Circuit control"
+        }
+      },
+      "room": {
+        "title": "Add room",
+        "data": {
+          "name": "Custom name",
+          "floor_id": "Floor",
+          "area_m2": "Area",
+          "heating_target_c": "Heating target",
+          "cooling_target_c": "Cooling target"
+        }
+      },
+      "source": {
+        "title": "Add heat source",
+        "data": {
+          "name": "Custom name",
+          "source_type": "Source type",
+          "zone_ids": "Served zones"
+        }
+      },
+      "manifold": {
+        "title": "Add manifold",
+        "data": {
+          "name": "Custom name",
+          "floor_id": "Floor",
+          "zone_id": "Hydraulic zone"
+        }
+      },
+      "circuit": {
+        "title": "Add circuit",
+        "data": {
+          "name": "Custom name",
+          "manifold_id": "Manifold",
+          "position": "Position from left to right",
+          "length_m": "Circuit length",
+          "room_id": "Room"
+        }
+      },
+      "binding": {
+        "title": "Add room sensor",
+        "data": {
+          "name": "Custom name",
+          "room_id": "Room",
+          "entity_id": "Sensor or thermostat"
+        }
+      }
+    },
+    "error": {
+      "invalid_name": "Invalid name.",
+      "invalid_reference": "Invalid reference.",
+      "invalid_number": "Invalid numeric value.",
+      "invalid_mode": "Invalid mode.",
+      "invalid_source": "Invalid source.",
+      "invalid_position": "Invalid position.",
+      "duplicate_position": "Position already occupied.",
+      "invalid_entity": "Incompatible entity.",
+      "duplicate_entity": "Sensor already associated.",
+      "invalid_schema": "Incompatible configuration."
     }
   }
 }
