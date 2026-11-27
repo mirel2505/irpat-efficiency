@@ -220,6 +220,35 @@ class IrpatEfficiencyPanel extends HTMLElement {
       for(const [id,v] of Object.entries(p.flows_lmin||{}))
         detail.append(this.node("div",(names.get(id)||id)+": "+v.toFixed(2)+" l/min"));
       detail.append(this.node("small",this.t("Valori istorice; nu reprezintă debite țintă obligatorii. Restaurarea se face doar manual.","Historical values, not mandatory flow targets. Restoration is manual only."),"muted"));
+      const observations=(entry.journal||[]).filter(s=>p.references?.[s.manifold_id] && (t.manifolds||[]).some(m=>m.id===s.manifold_id));
+      if(observations.length){
+        const label=this.node("label",this.t("Compară cu observația","Compare with observation"));
+        const select=this.node("select");
+        for(const s of observations.slice().reverse()){
+          const manifold=(t.manifolds||[]).find(m=>m.id===s.manifold_id);
+          select.append(new Option(manifold.name+" · "+new Date(s.timestamp).toLocaleString(),s.id));
+        }
+        label.append(select);
+        const button=this.node("button",this.t("Compară debitele","Compare flows"));button.type="button";
+        const output=this.node("div");output.setAttribute("role","status");
+        select.addEventListener("change",()=>output.replaceChildren());
+        button.addEventListener("click",async()=>{
+          if(!this._hass||this.busy||this.journalSaving)return;
+          this.journalSaving=true;button.disabled=true;select.disabled=true;output.replaceChildren();
+          try{
+            const result=await this._hass.callWS({type:"irpat_efficiency/profile_review",entry_id:entry.entry_id,profile_id:p.id,snapshot_id:select.value});
+            if(!detail.isConnected)return;
+            const fmt=v=>Number.isFinite(v)?v.toFixed(2)+" l/min":"—";
+            for(const row of result.rows){
+              output.append(this.node("p",row.position+". "+row.name+" · "+this.t("Referință: ","Reference: ")+fmt(row.reference_lmin)+" · "+this.t("Observat: ","Observed: ")+fmt(row.observed_lmin)+" · Δ "+fmt(row.difference_lmin)));
+            }
+            output.append(this.node("small",this.t("Diferențe brute, fără confirmarea condițiilor comparabile. Nu sunt instrucțiuni de reglaj.","Raw differences without confirmation of comparable conditions. Not adjustment instructions."),"muted"));
+          }catch(error){
+            if(detail.isConnected)output.textContent=this.t("Comparație indisponibilă: verifică dacă circuitele și zona corespund profilului.","Comparison unavailable: check that circuits and zone match the profile.");
+          }finally{this.journalSaving=false;button.disabled=false;select.disabled=false;}
+        });
+        detail.append(label,button,output);
+      }
       box.append(detail);
     }
     const create=this.node("details",undefined,"journal");
