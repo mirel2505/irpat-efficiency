@@ -39,7 +39,7 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
         if not hasattr(self, "_topology"):
             self._base = deepcopy(self.config_entry.options.get("topology", empty_topology()))
             self._topology = deepcopy(self._base)
-            self._draft_store = Store(self.hass, 1, f"{DOMAIN}.configuration_draft.{self.config_entry.entry_id}")
+            self._draft_store = Store(self.hass, 1, f"{DOMAIN}.configuration_draft.{self.config_entry.entry_id}", private=True, atomic_writes=True)
             locks = self.hass.data.setdefault(DOMAIN, {}).setdefault("draft_locks", {})
             self._draft_lock = locks.setdefault(self.config_entry.entry_id, asyncio.Lock())
             async with self._draft_lock:
@@ -87,7 +87,7 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
             menu.append("discard_draft")
         menu.append("save")
         return self.async_show_menu(step_id="init", menu_options=menu,
-                                    description_placeholders={"draft": str(self._topology != self._base)})
+                                    )
 
     async def _checkpoint(self):
         """Persist completed steps before showing the next page; no live options writes."""
