@@ -94,7 +94,8 @@
           "telemetry_rooms": "Senzori încăperi",
           "telemetry_sources": "Senzori surse termice",
           "telemetry_manifolds": "Senzori distribuitoare",
-          "source_settings": "Proprietăți și tarif sursă"
+          "source_settings": "Proprietăți și tarif sursă",
+          "mode_source": "Regim real sursă"
         }
       },
       "floor": {
@@ -210,6 +211,25 @@
           "power_boundary_confirmed": "Confirmă compatibilitatea măsurătorilor de putere",
           "energy_boundary_confirmed": "Confirmă limitele contorului de energie"
         }
+      },
+      "mode_source": {
+        "title": "Alege sursa",
+        "data": {
+          "source_id": "Sursă termică"
+        }
+      },
+      "mode_mapping": {
+        "title": "Asociază stările sursei",
+        "description": "Alege un senzor care raportează regimul efectiv, nu doar modul selectat. Introdu exact valorile brute raportate. Lasă necompletate stările inexistente. Elimină senzorul pentru a dezactiva funcția.",
+        "data": {
+          "entity_id": "Senzor regim real",
+          "heating": "Încălzire",
+          "cooling": "Răcire",
+          "dhw": "Apă caldă menajeră",
+          "standby": "Așteptare",
+          "defrost": "Degivrare",
+          "off": "Oprit"
+        }
       }
     },
     "error": {
@@ -227,7 +247,8 @@
       "invalid_fluid": "Agent termic invalid.",
       "invalid_fluid_properties": "Introdu ambele proprietăți valide pentru un agent termic cunoscut.",
       "invalid_tariff": "Tarif sau cod monedă invalid.",
-      "invalid_boundary": "Confirmare invalidă."
+      "invalid_boundary": "Confirmare invalidă.",
+      "invalid_mode_mapping": "Valorile trebuie să fie distincte, valide și să includă cel puțin o stare."
     }
   }
 }
