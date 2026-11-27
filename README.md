@@ -13,6 +13,12 @@ Initial configuration entry, topology model, native options forms for adding flo
 
 The initial hydraulic journal model now validates manual loop readings, distinguishes a measured manifold total from the sum of all loops and source flow, links before/after observations, and supports conditional normalization to a comparable reference total. The experimental administrator-only panel now includes a manual flow form for each manifold, before/after references, optional manifold/source totals and notes, plus the five latest observations per manifold from the last 100 entries. The backend appends to a per-entry HA Store, serializes writes, saves before reporting success, and attaches available room readings and zone context. Automatic supply/return/outdoor readings, full journal pagination, normalization display and integration-level validation remain pending. On 2026-11-27, 16 local unit tests passed: five calculation, six hydraulic snapshot, and five journal persistence tests using an injected simulated store. The Git blob hashes of the six calculation/journal/persistence source and test files matched their repository versions. Other test modules, the actual HA Store adapter, WebSocket endpoint and browser runtime have not yet been verified in this test run.
 
+## Thermal balance diagnostics — experimental
+
+The pure Python thermal balance engine compares aligned five-minute room samples over at least 24 hours, with a provisional minimum common coverage of 90% and ±0.3°C tolerance. It separates common temperature error from individual room residuals, uses area weighting only when every room has a valid area, and reports observed in-tolerance sample fractions. It returns settling when a known adjustment occurs within the analysis interval and monitor-only when the caller identifies an incompatible operating mode. These are descriptive diagnostics, not automatic hardware instructions or certification of balance. Wiring to actual zone topology, configuration revision history, environmental comparability, intervention detection, consecutive-day confirmation and panel display are still pending.
+
+Seven thermal balance unit tests were executed locally on 2026-11-27 and passed. The tested source and test file Git blob hashes were verified against the repository: `cb175b075f165a64f0626a46243e6ddaa8d6d79c` and `af6fea7901442319d6aad4fb69e2e3a039cd98d9`. No full Home Assistant runtime validation has been performed in this step.
+
 ## Principii / Principles
 
 - Local, read-only towards physical equipment; manual adjustments by the user.
