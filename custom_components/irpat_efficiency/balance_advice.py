@@ -33,6 +33,24 @@ def recommendations(topology, series, now, journal, since):
                              "coverage": 0, "hours": 48, "outdoor_means_c": [],
                              "advisory_only": True, "review_required": True,
                              "window_start": start, "window_end": end}
+        observations = [x for x in journal if mids.get(x["manifold_id"]) == zid]
+        changes = [datetime.fromisoformat(x["timestamp"]).timestamp() for x in observations
+                   if x["phase"] in ("before", "after", "adjustment")]
+        # First recorded setting per distributor starts a baseline; subsequent
+        # ordinary readings do not reset the adjustment window.
+        for mid in {x["manifold_id"] for x in observations}:
+            changes.append(min(datetime.fromisoformat(x["timestamp"]).timestamp()
+                               for x in observations if x["manifold_id"] == mid))
+        if changes:
+            last = max(changes)
+            row["last_adjustment_at"] = last
+            # First full five-minute sample strictly after a mid-slot change.
+            ready = ((int(last) + SLOT - 1) // SLOT) * SLOT + 2 * DAY
+            if last > int(last):
+                ready = max(ready, (int(last)//SLOT+1)*SLOT+2*DAY)
+            row["earliest_review_at"] = ready
+            row["elapsed_hours"] = max(0, (now-last)/3600)
+            row["remaining_hours"] = max(0, (ready-now)/3600)
         if balancing_capability(zone["operating_mode"], zone["circuit_control"]) == "monitor_only":
             row["status"] = "configure_operation"
             continue
@@ -52,27 +70,9 @@ def recommendations(topology, series, now, journal, since):
             continue
         if not valid(since) or since > start:
             continue
-        observations = [x for x in journal if mids.get(x["manifold_id"]) == zid]
-        changes = [datetime.fromisoformat(x["timestamp"]).timestamp() for x in observations
-                   if x["phase"] in ("before", "after", "adjustment")]
-        # First recorded setting per distributor starts a baseline; subsequent
-        # ordinary readings do not reset the adjustment window.
-        for mid in {x["manifold_id"] for x in observations}:
-            changes.append(min(datetime.fromisoformat(x["timestamp"]).timestamp()
-                               for x in observations if x["manifold_id"] == mid))
-        if changes:
-            last = max(changes)
-            row["last_adjustment_at"] = last
-            # First full five-minute sample strictly after a mid-slot change.
-            ready = ((int(last) + SLOT - 1) // SLOT) * SLOT + 2 * DAY
-            if last > int(last):
-                ready = max(ready, (int(last)//SLOT+1)*SLOT+2*DAY)
-            row["earliest_review_at"] = ready
-            row["elapsed_hours"] = max(0, (now-last)/3600)
-            row["remaining_hours"] = max(0, (ready-now)/3600)
-            if end < ready:
-                row["status"] = "settling"
-                continue
+        if row.get("earliest_review_at", 0) > end:
+            row["status"] = "settling"
+            continue
         outdoor = series.get("__outdoor__", {})
         days = []
         for begin in (start, start + DAY):

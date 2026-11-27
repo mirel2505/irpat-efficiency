@@ -105,6 +105,15 @@ class IrpatEfficiencyPanel extends HTMLElement {
     box.append(this.node("summary",this.t("Înregistrează debitele manual","Record manual flow readings")));
     box.addEventListener("toggle",()=>{if(box.isConnected) draft.open=box.open;});
     const records=(entry.journal||[]).filter(r=>r.manifold_id===manifold.id).reverse();
+    const review=entry.balance_advice?.[manifold.zone_id];
+    if(review?.last_adjustment_at!=null){
+      const status=this.node("div",undefined,"journal-record");
+      status.append(this.node("strong",this.t("Monitorizare după reglaj · zonă","Post-adjustment monitoring · zone")),
+        this.node("small",this.t("Ultima referință/reglaj: ","Last baseline/adjustment: ")+new Date(review.last_adjustment_at*1000).toLocaleString()),
+        this.node("small",this.t("Timp trecut: ","Elapsed: ")+review.elapsed_hours.toFixed(1)+" h"),
+        this.node("small",review.remaining_hours>0?this.t("Reevaluare cel mai devreme: ","Earliest reassessment: ")+new Date(review.earliest_review_at*1000).toLocaleString():this.t("Intervalul minim a trecut; verifică disponibilitatea recomandărilor.","Minimum interval elapsed; check advice availability.")));
+      box.append(status);
+    }
     const previous=this.node("select");
     previous.append(new Option(this.t("Alege înregistrarea inițială","Choose initial observation"),""));
     const updatePrevious=()=>{
