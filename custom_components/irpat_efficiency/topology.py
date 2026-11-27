@@ -100,7 +100,7 @@ def add_item(topology: dict, collection: str, name: str, **fields) -> tuple[dict
         _reference(data, "rooms", room)
         if not isinstance(entity, str) or not entity.startswith(("sensor.", "climate.")):
             raise TopologyError("invalid_entity")
-        if any(b["entity_id"] == entity and b["room_id"] == room for b in data["bindings"]):
+        if entity == data.get("outdoor_entity_id") or any(b["entity_id"] == entity for b in data["bindings"]):
             raise TopologyError("duplicate_entity")
         item.update(room_id=room, entity_id=entity,
                     attribute="current_temperature" if entity.startswith("climate.") else None)
@@ -119,3 +119,17 @@ def rename_item(topology: dict, collection: str, identifier: str, name: str) -> 
             item["name"] = _name(name)
             break
     return data
+
+
+def temperature_conflicts(topology: dict) -> set[str]:
+    """Rooms whose temperature readings are not independent of other rooms/outdoors."""
+    owners = {}
+    conflicts = set()
+    for binding in topology.get("bindings", []):
+        entity, room = binding["entity_id"], binding["room_id"]
+        if entity == topology.get("outdoor_entity_id"):
+            conflicts.add(room)
+        if entity in owners:
+            conflicts.update((owners[entity], room))
+        owners[entity] = room
+    return conflicts
