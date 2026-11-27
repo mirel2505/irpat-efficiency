@@ -34,6 +34,7 @@ def ws_overview(hass, connection, msg):
         journal = hass.data[DOMAIN]["journals"].get(entry.entry_id)
         profiles = hass.data[DOMAIN]["profiles"].get(entry.entry_id)
         monitor = hass.data[DOMAIN]["defrost_monitors"].get(entry.entry_id)
+        energy = hass.data[DOMAIN]["energy_monitors"].get(entry.entry_id)
         rooms = read_rooms(hass, topology)
         telemetry = read_telemetry(hass, topology)
         overview.append({"entry_id": entry.entry_id, "name": entry.title, "topology": topology,
@@ -42,6 +43,8 @@ def ws_overview(hass, connection, msg):
                          "journal": journal.recent() if journal else [],
                          "room_temperatures": rooms,
                          "telemetry": telemetry,
+                         "energy_history": energy.overview(topology, telemetry) if energy else {},
+                         "energy_save_failed": energy.save_failed if energy else False,
                          "live_diagnostics": live_diagnostics(topology, telemetry, rooms, dt_util.utcnow().timestamp()),
                          "history": history.overview(topology) if history else {},
                          "history_save_failed": history.save_failed if history else False,
