@@ -13,7 +13,7 @@ from homeassistant.util import dt as dt_util
 from .const import DOMAIN
 from .history import compare_room, record_samples
 from .temperature_reader import read_rooms, read_binding
-from .topology import empty_topology
+from .topology import empty_topology, temperature_conflicts
 from .temperature import summarize_room
 from .zone_analysis import zone_diagnostics
 from .weather_history import daily_observations
@@ -65,6 +65,7 @@ class RoomHistory:
             if room_id and zone_id:
                 membership.setdefault(room_id, set()).add(zone_id)
         result = {}
+        conflicts = temperature_conflicts(topology)
         for zone in topology["zones"]:
             zid = zone["id"]
             if any(zid in zones and len(zones) > 1 for zones in membership.values()):
@@ -72,6 +73,8 @@ class RoomHistory:
             rooms = [{"id": r["id"], "area_m2": r.get("area_m2"),
                       "target_c": r.get("heating_target_c")}
                      for r in topology["rooms"] if membership.get(r["id"]) == {zid}]
+            if conflicts.intersection(r["id"] for r in rooms):
+                continue
             result[zid] = daily_observations(
                 rooms, self.data, self.data.get(OUTDOOR_KEY, {}), now,
                 since=self.configuration_since)
