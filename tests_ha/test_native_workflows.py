@@ -24,6 +24,7 @@ async def test_native_options_edit_and_save(hass: HomeAssistant, enable_custom_i
     await hass.async_block_till_done()
     manager = hass.config_entries.options
     result = await manager.async_init(entry.entry_id)
+    result = await manager.async_configure(result["flow_id"], {"next_step_id": "all_actions"})
     flow_id = result["flow_id"]
     assert result["type"] is FlowResultType.MENU
     assert "edit" in result["menu_options"]
