@@ -11,6 +11,7 @@ from .const import OPERATING_MODES, CIRCUIT_CONTROLS
 from .topology import SOURCE_TYPES, TopologyError, add_item, empty_topology
 from .telemetry import ROLE_GROUPS, set_binding
 from .source_settings import FLUID_TYPES, set_source_settings
+from .operation_mode import MODES, configure_mode
 
 
 def _choices(values, translation_key):
@@ -35,6 +36,7 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
             menu.append("source")
         if t["sources"]:
             menu.append("source_settings")
+            menu.append("mode_source")
         if t["floors"] and t["zones"]:
             menu.append("manifold")
         if t["manifolds"]:
@@ -208,6 +210,38 @@ class IrpatOptionsFlow(config_entries.OptionsFlow):
         fields[vol.Optional("currency")] = selector.TextSelector()
         schema = self.add_suggested_values_to_schema(vol.Schema(fields), source)
         return self.async_show_form(step_id="source_properties", data_schema=schema, errors=errors)
+
+    async def async_step_mode_source(self, user_input=None):
+        if user_input is not None:
+            self._mode_source = user_input["source_id"]
+            return await self.async_step_mode_mapping()
+        return self.async_show_form(step_id="mode_source", data_schema=vol.Schema({
+            vol.Required("source_id"): self._reference("sources"),
+        }))
+
+    async def async_step_mode_mapping(self, user_input=None):
+        source = next((s for s in self._topology["sources"] if s["id"] == self._mode_source), None)
+        if source is None:
+            return await self.async_step_mode_source()
+        errors = {}
+        if user_input is not None:
+            try:
+                values = dict(user_input)
+                entity = values.pop("entity_id", None) or None
+                self._topology = configure_mode(self._topology, source["id"], entity, **values)
+                return await self.async_step_init()
+            except ValueError as exc:
+                errors["base"] = str(exc)
+        binding = source.get("mode_binding", {})
+        suggested = {mode: raw for raw, mode in binding.get("mapping", {}).items()}
+        if binding.get("entity_id"):
+            suggested["entity_id"] = binding["entity_id"]
+        fields = {vol.Optional("entity_id"): selector.EntitySelector(
+            selector.EntitySelectorConfig(filter=[{"domain": "sensor"}]))}
+        for mode in MODES:
+            fields[vol.Optional(mode)] = selector.TextSelector()
+        schema = self.add_suggested_values_to_schema(vol.Schema(fields), suggested)
+        return self.async_show_form(step_id="mode_mapping", data_schema=schema, errors=errors)
 
     async def async_step_save(self, user_input=None):
         return self.async_create_entry(title="", data={
