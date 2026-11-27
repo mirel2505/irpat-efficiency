@@ -375,6 +375,10 @@ class IrpatEfficiencyPanel extends HTMLElement {
         const value=row.electric_kwh==null?"—":row.electric_kwh.toFixed(2)+" kWh";
         const card=this.card(names[key],value);
         card.append(this.node("small",this.t("Acoperire: ","Coverage: ")+(row.coverage==null?"—":(100*row.coverage).toFixed(1)+"%"),"muted"));
+        if(row.current_tariff_cost){
+          const c=row.current_tariff_cost;
+          card.append(this.node("small",this.t("Estimare la tariful actual: ","Estimate at current tariff: ")+c.amount.toFixed(2)+" "+c.currency,"muted"));
+        }
         grid.append(card);
       }
       box.append(grid);
