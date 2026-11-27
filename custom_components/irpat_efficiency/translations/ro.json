@@ -91,7 +91,7 @@
     "step": {
       "init": {
         "title": "Configurația instalației",
-        "description": "Adaugă niveluri și zone, apoi încăperi, distribuitoare, circuite și senzori. Apasă Salvează pentru a păstra modificările.",
+        "description": "Adaugă niveluri și zone, apoi încăperi, distribuitoare, circuite și senzori. Pașii finalizați sunt păstrați într-o ciornă locală, reluată la redeschiderea meniului. Apasă Salvează configurația pentru aplicare.",
         "menu_options": {
           "floor": "Adaugă sau alege nivel",
           "zone": "Adaugă zonă hidraulică",
@@ -110,7 +110,8 @@
           "edit": "Editează configurația existentă",
           "remove": "Elimină un element din configurație",
           "import_structure": "Importă nivelurile și încăperile Home Assistant",
-          "discover_sensors": "Detectează senzorii încăperii"
+          "discover_sensors": "Detectează senzorii încăperii",
+          "discard_draft": "Renunță la ciornă (păstrează configurația salvată)"
         }
       },
       "floor": {
@@ -340,6 +341,13 @@
           "temperatures": "Senzori de temperatură / termostate",
           "humidity": "Senzor de umiditate"
         }
+      },
+      "discard_draft": {
+        "title": "Renunță la ciornă",
+        "description": "Se elimină numai modificările neaplicate. Configurația salvată și istoricul rămân.",
+        "data": {
+          "confirmed": "Confirm renunțarea"
+        }
       }
     },
     "error": {
@@ -365,6 +373,11 @@
       "registry_conflict": "Asociere locală ambiguă. Redenumește elementele locale aflate în conflict înainte de import.",
       "registry_floor_required": "Încăperea nu are nivel asociat. Adaugă întâi un nivel local sau alege unul de rezervă.",
       "registry_confirmation_required": "Confirmă explicit importul."
+    },
+    "abort": {
+      "draft_conflict": "Configurația sau ciorna s-a schimbat în altă sesiune. Redeschide Configure pentru ultima ciornă.",
+      "draft_read_failed": "Ciorna nu a putut fi citită. Verifică jurnalele Home Assistant.",
+      "draft_write_failed": "Ultimul pas nu a putut fi salvat în ciornă. Pașii salvați anterior rămân; verifică jurnalele."
     }
   }
 }
