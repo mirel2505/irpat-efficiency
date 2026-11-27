@@ -23,7 +23,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          python-version: '3.14.2'
       - name: Install matching Core and test harness
         env:
           HA_CORE: ${{ matrix.core }}
