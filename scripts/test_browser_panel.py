@@ -95,7 +95,7 @@ def run_case(browser, language, width, dark):
     assert panel.locator("script").count() == 0
     expect(panel.get_by_role("button", name=word("Simplu","Simple"), exact=True)).to_have_attribute("aria-pressed","true")
     # Record a zero in the actual native form; preserve its type in the payload.
-    journal = panel.locator("details.journal").filter(has=panel.get_by_text(
+    journal = panel.locator("details.journal").filter(has=page.get_by_text(
         word("Înregistrează debitele manual","Record manual flow readings"), exact=True))
     journal.locator("summary").click()
     journal.locator(".flow-fields input").first.fill("0")
@@ -106,11 +106,11 @@ def run_case(browser, language, width, dark):
     panel.get_by_role("button", name="Expert", exact=True).click()
     expect(panel.get_by_role("heading", name=word("Istoric degivrări","Defrost history"))).to_be_visible()
     expect(panel.get_by_role("heading", name=word("Istoric regimuri raportate","Reported mode history"))).to_be_visible()
-    profile = panel.locator("details.journal").filter(has=panel.locator("summary").filter(has_text="Reference profile"))
+    profile = panel.locator("details.journal").filter(has=page.locator("summary").filter(has_text="Reference profile"))
     profile.locator("summary").click()
     profile.get_by_role("button", name=word("Compară debitele","Compare flows")).click()
     expect(profile.get_by_text("Δ -1.20 l/min", exact=False)).to_be_visible()
-    export = panel.locator("details.journal").filter(has=panel.get_by_text(word("Export date","Export data"), exact=True))
+    export = panel.locator("details.journal").filter(has=page.get_by_text(word("Export date","Export data"), exact=True))
     export.locator("summary").click()
     export.get_by_role("button", name=word("Pregătește exportul","Prepare export")).click()
     with page.expect_download() as event:
