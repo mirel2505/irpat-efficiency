@@ -10,5 +10,11 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/mirel2505/irpat-efficiency/issues",
   "requirements": [],
-  "version": "0.1.0.dev0"
+  "version": "0.1.0.dev0",
+  "dependencies": [
+    "frontend",
+    "http",
+    "panel_custom",
+    "websocket_api"
+  ]
 }
