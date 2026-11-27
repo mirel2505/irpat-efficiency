@@ -8,6 +8,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
+from .storage_identity import storage_key
 from .event_journal import EventJournal
 from .mode_history import observation, transition
 from .topology import empty_topology
@@ -19,7 +20,7 @@ class ModeMonitor:
     def __init__(self, hass, entry):
         self.hass = hass
         self.entry = entry
-        self.store = Store(hass, 1, f"{DOMAIN}.modes.{entry.entry_id}")
+        self.store = Store(hass, 1, storage_key(entry, "modes"))
         self.journal = EventJournal(self.store, "observed_at", 3000)
         self.previous = {}
         self.last_sample = None
