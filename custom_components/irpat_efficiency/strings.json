@@ -47,6 +47,24 @@
         "other": "Other",
         "unintegrated": "Not integrated"
       }
+    },
+    "telemetry_role": {
+      "options": {
+        "humidity": "Humidity",
+        "surface_temperature": "Floor surface temperature",
+        "supply_temperature": "Supply temperature",
+        "return_temperature": "Return temperature",
+        "flow": "Flow",
+        "electrical_power": "Electrical power",
+        "electrical_energy": "Electrical energy",
+        "thermal_power": "Thermal power",
+        "thermal_energy": "Thermal energy",
+        "compressor": "Compressor",
+        "defrost": "Defrost",
+        "burner": "Burner",
+        "pump": "Pump",
+        "pressure": "Pressure"
+      }
     }
   },
   "options": {
@@ -63,7 +81,10 @@
           "circuit": "Add circuit",
           "binding": "Add room sensor",
           "save": "Save configuration",
-          "outdoor": "Configure outdoor sensor"
+          "outdoor": "Configure outdoor sensor",
+          "telemetry_rooms": "Room sensors",
+          "telemetry_sources": "Heat source sensors",
+          "telemetry_manifolds": "Manifold sensors"
         }
       },
       "floor": {
@@ -130,6 +151,36 @@
         "data": {
           "entity_id": "Outdoor sensor"
         }
+      },
+      "telemetry_rooms": {
+        "title": "Room sensors",
+        "description": "Choose an object, role and entity. Leave the entity blank to remove the role binding.",
+        "data": {
+          "owner_id": "Object",
+          "role": "Measurement type",
+          "name": "Custom name (optional)",
+          "entity_id": "Entity"
+        }
+      },
+      "telemetry_sources": {
+        "title": "Heat source sensors",
+        "description": "Choose an object, role and entity. Leave the entity blank to remove the role binding.",
+        "data": {
+          "owner_id": "Object",
+          "role": "Measurement type",
+          "name": "Custom name (optional)",
+          "entity_id": "Entity"
+        }
+      },
+      "telemetry_manifolds": {
+        "title": "Manifold sensors",
+        "description": "Choose an object, role and entity. Leave the entity blank to remove the role binding.",
+        "data": {
+          "owner_id": "Object",
+          "role": "Measurement type",
+          "name": "Custom name (optional)",
+          "entity_id": "Entity"
+        }
       }
     },
     "error": {
@@ -142,7 +193,8 @@
       "duplicate_position": "Position already occupied.",
       "invalid_entity": "Incompatible entity.",
       "duplicate_entity": "Sensor already associated.",
-      "invalid_schema": "Incompatible configuration."
+      "invalid_schema": "Incompatible configuration.",
+      "invalid_role": "Incompatible role."
     }
   }
 }
