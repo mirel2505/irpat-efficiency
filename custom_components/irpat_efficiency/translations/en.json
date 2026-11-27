@@ -93,9 +93,9 @@
         "title": "System configuration",
         "description": "Add floors and zones, then rooms, manifolds, circuits and sensors. Select Save to persist changes.",
         "menu_options": {
-          "floor": "Add floor",
+          "floor": "Add or select floor",
           "zone": "Add hydraulic zone",
-          "room": "Add room",
+          "room": "Add or select room",
           "source": "Add heat source",
           "manifold": "Add manifold",
           "circuit": "Add circuit",
@@ -108,13 +108,16 @@
           "source_settings": "Source properties and tariff",
           "mode_source": "Reported source mode",
           "edit": "Edit existing configuration",
-          "remove": "Remove configuration object"
+          "remove": "Remove configuration object",
+          "import_structure": "Import Home Assistant floors and areas",
+          "discover_sensors": "Discover room sensors"
         }
       },
       "floor": {
-        "title": "Add floor",
-        "data": {
-          "name": "Custom name"
+        "title": "Add or select floor",
+        "menu_options": {
+          "floor_existing": "Choose existing Home Assistant floor",
+          "floor_custom": "Create custom floor in irPaT"
         }
       },
       "zone": {
@@ -126,13 +129,10 @@
         }
       },
       "room": {
-        "title": "Add room",
-        "data": {
-          "name": "Custom name",
-          "floor_id": "Floor",
-          "area_m2": "Area",
-          "heating_target_c": "Heating target",
-          "cooling_target_c": "Cooling target"
+        "title": "Add or select room",
+        "menu_options": {
+          "room_existing": "Choose existing Home Assistant area",
+          "room_custom": "Create custom room in irPaT"
         }
       },
       "source": {
@@ -284,6 +284,62 @@
           "item_id": "Object",
           "confirmed": "Confirm removal from configuration"
         }
+      },
+      "floor_custom": {
+        "title": "Add floor",
+        "data": {
+          "name": "Custom name"
+        }
+      },
+      "room_custom": {
+        "title": "Add room",
+        "data": {
+          "name": "Custom name",
+          "floor_id": "Floor",
+          "area_m2": "Area",
+          "heating_target_c": "Heating target",
+          "cooling_target_c": "Cooling target"
+        }
+      },
+      "floor_existing": {
+        "title": "Select existing floor",
+        "description": "Reuses a uniquely matching existing irPaT floor by name, keeping its ID. No Home Assistant registry changes.",
+        "data": {
+          "ha_floor_id": "Home Assistant floor"
+        }
+      },
+      "room_existing": {
+        "title": "Select existing area",
+        "description": "Uses the native floor when assigned. An unassigned area needs a local fallback floor. A unique matching local room is reused. Empty properties preserve existing values. Confirm only actual ambient sensors on the next screen.",
+        "data": {
+          "ha_area_id": "Home Assistant area",
+          "fallback_floor": "Floor for unassigned area (optional)",
+          "area_m2": "Area",
+          "heating_target_c": "Heating target",
+          "cooling_target_c": "Cooling target"
+        }
+      },
+      "import_structure": {
+        "title": "Import Home Assistant floors and areas",
+        "description": "Found {floors} floors and {rooms} areas ({unassigned} without a valid floor). Import all assigned areas and floors. Unassigned areas are skipped unless you choose a previously added local floor below. Unique same-name local objects are linked; existing IDs, targets and bindings are preserved. Nothing is written to HA registries. Review sensors separately, then Save configuration.",
+        "data": {
+          "confirmed": "Confirm import and matching existing local objects",
+          "fallback_floor": "Floor for all unassigned areas (optional)"
+        }
+      },
+      "discover_sensors": {
+        "title": "Discover room sensors",
+        "data": {
+          "room_id": "Linked room"
+        }
+      },
+      "confirm_sensors": {
+        "title": "Confirm suggested room sensors",
+        "description": "{count} unused candidates assigned to this area or its devices. Select only actual ambient temperature readings (not water/floor probes), or thermostats reporting current temperature. Do not select duplicate measurements of the same probe. Select at most one humidity sensor. Empty selection adds nothing; existing bindings are not replaced.",
+        "data": {
+          "temperatures": "Temperature sensors / thermostats",
+          "humidity": "Humidity sensor"
+        }
       }
     },
     "error": {
@@ -305,7 +361,10 @@
       "invalid_mode_mapping": "Provide at least one valid, distinct raw state value.",
       "unsupported_edit": "This structural change requires a new object.",
       "object_in_use": "Other configuration objects depend on this object. Remove dependencies first.",
-      "remove_confirmation_required": "Explicit confirmation is required."
+      "remove_confirmation_required": "Explicit confirmation is required.",
+      "registry_conflict": "Ambiguous local match. Rename the conflicting local objects before importing.",
+      "registry_floor_required": "This area has no assigned floor. Add a local floor first or choose a fallback.",
+      "registry_confirmation_required": "Confirm the import explicitly."
     }
   }
 }
