@@ -18,9 +18,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .profile_store import ProfileStore
     from .defrost_monitor import DefrostMonitor
     from .energy_monitor import EnergyMonitor
+    from .mode_monitor import ModeMonitor
     from homeassistant.helpers.storage import Store
 
-    runtime = hass.data.setdefault(DOMAIN, {"active_entries": set(), "histories": {}, "journals": {}, "profiles": {}, "defrost_monitors": {}, "energy_monitors": {}})
+    runtime = hass.data.setdefault(DOMAIN, {"active_entries": set(), "histories": {}, "journals": {}, "profiles": {}, "defrost_monitors": {}, "energy_monitors": {}, "mode_monitors": {}})
     journal = HydraulicJournal(Store(hass, 1, f"{DOMAIN}.journal.{entry.entry_id}"))
     await journal.async_load()
     profiles = ProfileStore(Store(hass, 1, f"{DOMAIN}.profiles.{entry.entry_id}"))
@@ -29,15 +30,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await history.async_start()
     monitor = DefrostMonitor(hass, entry)
     energy = EnergyMonitor(hass, entry)
+    modes = ModeMonitor(hass, entry)
     try:
         await monitor.async_start()
         await energy.async_start()
+        await modes.async_start()
         await panel.async_register(hass)
     except Exception:
+        await modes.async_stop()
         await energy.async_stop()
         await monitor.async_stop()
         await history.async_stop()
         raise
+    runtime["mode_monitors"][entry.entry_id] = modes
     runtime["energy_monitors"][entry.entry_id] = energy
     runtime["defrost_monitors"][entry.entry_id] = monitor
     runtime["profiles"][entry.entry_id] = profiles
@@ -53,6 +58,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     runtime = hass.data.get(DOMAIN)
     if runtime:
+        modes = runtime["mode_monitors"].pop(entry.entry_id, None)
+        if modes is not None:
+            await modes.async_stop()
         energy = runtime["energy_monitors"].pop(entry.entry_id, None)
         if energy is not None:
             await energy.async_stop()
