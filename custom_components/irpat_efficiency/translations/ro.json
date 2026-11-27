@@ -74,6 +74,17 @@
         "ethylene_glycol": "Amestec cu etilenglicol",
         "other": "Alt agent termic"
       }
+    },
+    "edit_collection": {
+      "options": {
+        "floors": "Etaje",
+        "zones": "Zone hidraulice",
+        "sources": "Surse termice",
+        "rooms": "Camere",
+        "manifolds": "Distribuitoare",
+        "circuits": "Circuite",
+        "bindings": "Senzori de temperatură ai camerelor"
+      }
     }
   },
   "options": {
@@ -95,7 +106,8 @@
           "telemetry_sources": "Senzori surse termice",
           "telemetry_manifolds": "Senzori distribuitoare",
           "source_settings": "Proprietăți și tarif sursă",
-          "mode_source": "Regim real sursă"
+          "mode_source": "Regim real sursă",
+          "edit": "Editează configurația existentă"
         }
       },
       "floor": {
@@ -230,6 +242,33 @@
           "defrost": "Degivrare",
           "off": "Oprit"
         }
+      },
+      "edit": {
+        "title": "Editează configurația existentă",
+        "data": {
+          "collection": "Tipul elementului"
+        }
+      },
+      "edit_select": {
+        "title": "Alege elementul existent",
+        "data": {
+          "item_id": "Element"
+        }
+      },
+      "edit_item": {
+        "title": "Editează elementul",
+        "description": "Modificările se aplică doar după Salvarea configurației. Identificatorii și observațiile înregistrate sunt păstrate. Comparațiile istorice de temperatură reîncep pentru configurația modificată; păstrează același circuit fizic când îi corectezi poziția. Câmpurile numerice opționale goale elimină valorile.",
+        "data": {
+          "name": "Denumire",
+          "operating_mode": "Regim de funcționare",
+          "circuit_control": "Controlul circuitelor",
+          "area_m2": "Suprafață",
+          "heating_target_c": "Țintă încălzire",
+          "cooling_target_c": "Țintă răcire",
+          "position": "Poziție de la stânga la dreapta",
+          "length_m": "Lungimea circuitului",
+          "entity_id": "Senzor sau termostat"
+        }
       }
     },
     "error": {
@@ -248,7 +287,8 @@
       "invalid_fluid_properties": "Introdu ambele proprietăți valide pentru un agent termic cunoscut.",
       "invalid_tariff": "Tarif sau cod monedă invalid.",
       "invalid_boundary": "Confirmare invalidă.",
-      "invalid_mode_mapping": "Valorile trebuie să fie distincte, valide și să includă cel puțin o stare."
+      "invalid_mode_mapping": "Valorile trebuie să fie distincte, valide și să includă cel puțin o stare.",
+      "unsupported_edit": "Această schimbare structurală necesită un element nou."
     }
   }
 }
