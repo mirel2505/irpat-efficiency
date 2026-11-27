@@ -42,3 +42,16 @@ def test_common_error_is_not_local_adjustment():
     assert {r["direction"] for r in result["rooms"].values()}=={"observe"}
     t["zones"][0]["circuit_control"]="automatic"
     assert recommendations(t,data,172800,[],0)[z]["status"]=="configure_operation"
+
+
+def test_adjustment_resets_window():
+    from datetime import datetime, timezone
+    t,z,_=setup()
+    mid=t["manifolds"][0]["id"]
+    def record(stamp, phase):
+        return {"manifold_id":mid,"phase":phase,"timestamp":datetime.fromtimestamp(stamp,timezone.utc).isoformat()}
+    result=recommendations(t,{},172800,[record(0,"observation"),record(90000,"adjustment"),record(100000,"observation")],0)[z]
+    assert result["status"]=="settling"
+    assert result["last_adjustment_at"]==90000
+    assert result["earliest_review_at"]==262800
+    assert result["remaining_hours"]==25

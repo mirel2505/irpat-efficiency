@@ -31,7 +31,7 @@ def zone_diagnostics(topology, series, now, journal, configuration_since, mode):
         capability = balancing_capability(zone["operating_mode"], zone["circuit_control"])
         adjustments = [datetime.fromisoformat(item["timestamp"]).timestamp()
                        for item in journal if manifolds.get(item["manifold_id"]) == zid
-                       and item["phase"] in ("before", "after")]
+                       and item["phase"] in ("before", "after", "adjustment")]
         last = max(adjustments, default=None)
         if configuration_since is None or configuration_since > start:
             result = {"status": "configuration_collecting", "rooms": {}, "coverage": 0}

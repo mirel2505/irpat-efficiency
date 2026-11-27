@@ -107,22 +107,30 @@ class IrpatEfficiencyPanel extends HTMLElement {
     const records=(entry.journal||[]).filter(r=>r.manifold_id===manifold.id).reverse();
     const previous=this.node("select");
     previous.append(new Option(this.t("Alege înregistrarea inițială","Choose initial observation"),""));
-    for(const record of records.filter(r=>r.phase==="before")){
-      previous.append(new Option(new Date(record.timestamp).toLocaleString(),record.id));
-    }
-    previous.value=draft.previous_id;
+    const updatePrevious=()=>{
+      previous.replaceChildren(new Option(this.t("Alege înregistrarea inițială","Choose initial observation"),""));
+      for(const record of records.filter(r=>draft.phase==="adjustment"||r.phase==="before"))previous.append(new Option(new Date(record.timestamp).toLocaleString(),record.id));
+      previous.value=draft.previous_id|| (draft.phase==="adjustment"?records[0]?.id||"":"");
+      draft.previous_id=previous.value;
+    };
+    updatePrevious();
     previous.addEventListener("change",()=>{draft.previous_id=previous.value;});
     const phase=this.node("select");
-    for(const [value,ro,en] of [["observation","Observație","Observation"],["before","Înainte de reglaj","Before adjustment"],["after","După reglaj","After adjustment"]]) phase.append(new Option(this.t(ro,en),value));
+    for(const [value,ro,en] of [["observation","Observație","Observation"],["before","Înainte de reglaj","Before adjustment"],["after","După reglaj","After adjustment"],["adjustment","Am modificat debitmetre","I adjusted flow meters"]]) phase.append(new Option(this.t(ro,en),value));
     phase.value=draft.phase;
     const previousLabel=this.node("label",this.t("Înregistrare inițială","Initial observation"));
     previousLabel.append(previous);
-    previousLabel.hidden=draft.phase!=="after";
-    phase.addEventListener("change",()=>{draft.phase=phase.value;previousLabel.hidden=draft.phase!=="after";if(draft.phase!=="after")draft.previous_id="";});
+    const adjusting=()=>["after","adjustment"].includes(draft.phase);
+    previousLabel.hidden=!adjusting();
+    draft.adjusted=draft.adjusted||{};
+    const adjustmentHint=this.node("p",this.t("Bifează numai debitmetrele pe care le-ai reglat fizic. Recitește toate circuitele, inclusiv cele neatinse; nu copia automat citirile vechi.","Tick only physically adjusted meters. Remeasure all loops, including untouched ones; do not copy old readings."),"muted");
+    adjustmentHint.hidden=!adjusting();
+    const adjustmentChecks=[];
+    phase.addEventListener("change",()=>{draft.phase=phase.value;previousLabel.hidden=!adjusting();adjustmentHint.hidden=!adjusting();for(const l of adjustmentChecks)l.hidden=!adjusting();draft.previous_id="";updatePrevious();});
     const phaseLabel=this.node("label",this.t("Tip înregistrare","Observation type"));
     phaseLabel.append(phase);
     const form=this.node("form");
-    form.append(phaseLabel,previousLabel);
+    form.append(phaseLabel,previousLabel,adjustmentHint);
     const fields=this.node("div",undefined,"flow-fields");
     const numeric=(caption,value,update)=>{
       const label=this.node("label",caption);
@@ -143,7 +151,12 @@ class IrpatEfficiencyPanel extends HTMLElement {
     for(const circuit of circuits){
       const room=entry.topology?.rooms?.find(r=>r.id===circuit.room_id);
       const caption=circuit.position+". "+(room?.name||circuit.name)+" (l/min)";
-      fields.append(numeric(caption,draft.flows[circuit.id],v=>{draft.flows[circuit.id]=v;updateTotal();}));
+      const item=this.node("div");
+      const flag=this.node("label",this.t("Reglat fizic","Physically adjusted"));
+      const check=this.node("input");check.type="checkbox";check.checked=!!draft.adjusted[circuit.id];flag.prepend(check);
+      check.addEventListener("change",()=>{draft.adjusted[circuit.id]=check.checked;});
+      flag.hidden=!adjusting();adjustmentChecks.push(flag);
+      item.append(numeric(caption,draft.flows[circuit.id],v=>{draft.flows[circuit.id]=v;updateTotal();}),flag);fields.append(item);
     }
     updateTotal();form.append(fields,totalLabel);
     const methodLabel=this.node("label",this.t("Debit sursă termică — metodă","Heat source flow — method"));
@@ -181,11 +194,16 @@ class IrpatEfficiencyPanel extends HTMLElement {
       event.preventDefault();
       if(this.journalSaving||!this._hass) return;
       const readings=Object.fromEntries(circuits.filter(c=>draft.flows[c.id]!==undefined&&draft.flows[c.id]!=="").map(c=>[c.id,Number(draft.flows[c.id])]));
-      if(!Object.keys(readings).length|| (draft.phase==="after"&&!draft.previous_id)){
+      if(!Object.keys(readings).length|| (adjusting()&&!draft.previous_id)){
         message.textContent=this.t("Introdu cel puțin un debit și alege referința pentru reglajul ulterior.","Enter at least one reading and select a reference for an after observation.");return;
       }
       const request={type:"irpat_efficiency/journal_append",entry_id:entry.entry_id,manifold_id:manifold.id,readings,phase:draft.phase,note:draft.note};
-      if(draft.phase==="after")request.previous_id=draft.previous_id;
+      if(adjusting()){
+        request.previous_id=draft.previous_id;
+        request.adjusted_circuit_ids=circuits.filter(c=>draft.adjusted[c.id]).map(c=>c.id);
+        if(draft.phase==="adjustment"&&!request.adjusted_circuit_ids.length){message.textContent=this.t("Bifează debitmetrul reglat fizic.","Tick the physically adjusted meter.");return;}
+        if(request.adjusted_circuit_ids.some(id=>!(id in readings))){message.textContent=this.t("Introdu debitul nou al fiecărui circuit reglat.","Enter the new reading for each adjusted loop.");return;}
+      }
       // The server calculates the manifold total only from complete readings.
       if(draft.sourceMethod==="sensor"){
         if(!draft.sourceEntity){message.textContent=this.t("Alege senzorul de debit.","Choose a flow sensor.");return;}
@@ -209,10 +227,15 @@ class IrpatEfficiencyPanel extends HTMLElement {
     recent.append(this.node("h4",this.t("Ultimele observații","Recent observations")));
     for(const record of records.slice(0,5)){
       const row=this.node("div",undefined,"journal-record");
-      const phaseLabel={before:this.t("Înainte","Before"),after:this.t("După","After"),observation:this.t("Observație","Observation")};
+      const phaseLabel={before:this.t("Înainte","Before"),after:this.t("După","After"),observation:this.t("Observație","Observation"),adjustment:this.t("Reglaj efectuat","Adjustment made")};
       row.append(this.node("strong",new Date(record.timestamp).toLocaleString()+" · "+(phaseLabel[record.phase]||record.phase)));
       const labels=new Map(circuits.map(c=>[c.id,c.name]));
       for(const [id,value] of Object.entries(record.flows_lmin||{}))row.append(this.node("small",(labels.get(id)||this.t("Circuit arhivat","Archived circuit"))+": "+(value==null?"—":value.toFixed(2)+" l/min")));
+      for(const [id,c] of Object.entries(record.flow_changes||{})){
+        const diff=c.difference_lmin;
+        const kind=c.direct_adjustment===true?this.t("Reglat fizic","Physically adjusted"):c.direct_adjustment===false?this.t("Nereglat direct","Not directly adjusted"):this.t("Reglaj necunoscut","Adjustment unknown");
+        row.append(this.node("small",(labels.get(id)||id)+" · "+kind+" · "+c.before_lmin.toFixed(2)+" → "+c.after_lmin.toFixed(2)+" l/min ("+(diff>=0?"+":"")+diff.toFixed(2)+")"));
+      }
       row.append(this.node("small",this.t("Total distribuitor: ","Manifold total: ")+(record.manifold_total_lmin==null?"—":record.manifold_total_lmin.toFixed(2)+" l/min")));
       row.append(this.node("small",this.t("Debit sursă: ","Source flow: ")+(record.source_total_m3h==null?"—":record.source_total_m3h.toFixed(2)+" m³/h")));
       const sourceInfo=record.context?.source_flow;
@@ -845,6 +868,13 @@ class IrpatEfficiencyPanel extends HTMLElement {
     const names=new Map(entry.topology.rooms.map(r=>[r.id,r.name]));
     for(const [id,a] of rows){
       const zone=this.node("div",undefined,"advice-zone");zone.append(this.node("h3",a.name));
+      if(a.last_adjustment_at!=null){
+        zone.append(this.node("small",this.t("Ultima referință/reglaj: ","Last baseline/adjustment: ")+new Date(a.last_adjustment_at*1000).toLocaleString(),"muted"));
+        if(a.remaining_hours>0){
+          zone.append(this.node("p",this.t("Trecute: ","Elapsed: ")+a.elapsed_hours.toFixed(1)+" h · "+this.t("Rămase minimum: ","Minimum remaining: ")+a.remaining_hours.toFixed(1)+" h"));
+          zone.append(this.node("small",this.t("Reevaluare cel mai devreme: ","Earliest reassessment: ")+new Date(a.earliest_review_at*1000).toLocaleString(),"muted"));
+        }
+      }
       if(a.status!=="review_conditions"){zone.append(this.node("p",labels[a.status]||a.status));box.append(zone);continue;}
       const key=entry.entry_id+":"+entry.revision+":"+id+":"+a.window_end+":"+JSON.stringify(a.rooms);
       zone.append(this.node("p",this.t("Analiză: 48 h · exterior ","Analysis: 48 h · outdoor ")+a.outdoor_means_c.map(v=>v.toFixed(1)+"°C").join(" / ")+" · "+Math.round(a.coverage*100)+"%"));

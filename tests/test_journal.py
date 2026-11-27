@@ -46,3 +46,15 @@ class JournalTests(unittest.TestCase):
         before = make_snapshot(self.topology, "m", {"a": 1, "b": 2})
         after = make_snapshot(self.topology, "m", {"a": 1}, manifold_total_lmin=3)
         self.assertIsNone(compare_snapshots(before, after, comparable=True))
+
+    def test_explicit_adjustment_and_indirect_changes(self):
+        prior = make_snapshot(self.topology, "m", {"a": 1.2, "b": 1})
+        after = make_snapshot(self.topology, "m", {"a": .9, "b": 1.1},
+                              phase="adjustment", previous=prior, adjusted_circuit_ids=["a"])
+        self.assertEqual(after["previous_id"], prior["id"])
+        self.assertTrue(after["flow_changes"]["a"]["direct_adjustment"])
+        self.assertFalse(after["flow_changes"]["b"]["direct_adjustment"])
+        self.assertAlmostEqual(after["flow_changes"]["b"]["difference_lmin"], .1)
+        with self.assertRaises(ValueError):
+            make_snapshot(self.topology, "m", {"b": 1}, phase="adjustment",
+                          previous=prior, adjusted_circuit_ids=["a"])

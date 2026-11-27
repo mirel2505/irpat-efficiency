@@ -141,8 +141,9 @@ def ws_overview(hass, connection, msg):
     vol.Required("entry_id"): str,
     vol.Required("manifold_id"): str,
     vol.Required("readings"): {str: vol.Any(int, float, None)},
-    vol.Required("phase"): vol.In(("observation", "before", "after")),
+    vol.Required("phase"): vol.In(("observation", "before", "after", "adjustment")),
     vol.Optional("previous_id"): str,
+    vol.Optional("adjusted_circuit_ids"): [str],
     vol.Optional("manifold_total_lmin"): vol.Any(int, float),
     vol.Optional("source_total_m3h"): vol.Any(int, float),
     vol.Optional("source_flow_entity_id"): str,
@@ -182,6 +183,7 @@ async def ws_journal_append(hass, connection, msg):
         result = await journal.async_append(
             topology, msg["manifold_id"], msg["readings"],
             phase=msg["phase"], previous_id=msg.get("previous_id"),
+            adjusted_circuit_ids=msg.get("adjusted_circuit_ids"),
             manifold_total_lmin=msg.get("manifold_total_lmin"),
             source_total_m3h=source_total,
             note=msg["note"], context=context,
