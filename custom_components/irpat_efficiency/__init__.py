@@ -15,11 +15,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from . import panel
     from .history_store import RoomHistory
     from .journal_store import HydraulicJournal
+    from .profile_store import ProfileStore
     from homeassistant.helpers.storage import Store
 
-    runtime = hass.data.setdefault(DOMAIN, {"active_entries": set(), "histories": {}, "journals": {}})
+    runtime = hass.data.setdefault(DOMAIN, {"active_entries": set(), "histories": {}, "journals": {}, "profiles": {}})
     journal = HydraulicJournal(Store(hass, 1, f"{DOMAIN}.journal.{entry.entry_id}"))
     await journal.async_load()
+    profiles = ProfileStore(Store(hass, 1, f"{DOMAIN}.profiles.{entry.entry_id}"))
+    await profiles.async_load()
     history = RoomHistory(hass, entry)
     await history.async_start()
     try:
@@ -27,6 +30,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception:
         await history.async_stop()
         raise
+    runtime["profiles"][entry.entry_id] = profiles
     runtime["journals"][entry.entry_id] = journal
     runtime["histories"][entry.entry_id] = history
     runtime["active_entries"].add(entry.entry_id)
@@ -39,6 +43,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     runtime = hass.data.get(DOMAIN)
     if runtime:
+        profiles = runtime["profiles"].pop(entry.entry_id, None)
+        if profiles is not None:
+            await profiles.async_close()
         journal = runtime["journals"].pop(entry.entry_id, None)
         if journal is not None:
             await journal.async_close()
